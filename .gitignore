@@ -1,0 +1,10 @@
+tmp/
+outputs/
+output/pdf/previews/
+Ável _ Simulador Consórcio x Financiamento.pdf
+*.xlsx
+node_modules/
+**/__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
