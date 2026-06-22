@@ -1,0 +1,910 @@
+MANUAL DE CALCULOS
+Calculadora de Aquisicao
+
+Arquivo documentado:
+Calculadora de Aquisicao.xlsx
+
+Data do manual: 22/06/2026
+
+
+1. OBJETIVO DO MODELO
+
+O modelo compara quatro estrategias para a mesma pessoa:
+
+1. Financiamento sem amortizacao.
+2. Financiamento com amortizacao usando caixa livre mensal.
+3. Financiamento + consorcio como interveniente quitante.
+4. Consorcio direto.
+
+A comparacao e feita mes a mes. A pessoa parte de uma reserva inicial, tem um caixa livre mensal comum a todas as alternativas, paga entradas, parcelas, aluguel quando aplicavel, recebe aluguel quando aplicavel e investe sobras pela taxa de oportunidade.
+
+A regra central e:
+
+Se uma estrategia exige mais caixa do que a reserva acumulada e o caixa livre mensal conseguem suportar, ela nao e executavel. Nesse caso, o resumo mostra "Inviavel" em vez de mostrar patrimonio, VPL ou gap como se a alternativa pudesse ser recomendada.
+
+
+2. CONVENCOES GERAIS
+
+2.1. Periodicidade
+
+O modelo e mensal.
+
+O mes 1 e a data de inicio dos pagamentos informada em Premissas!B4.
+
+Formula de data mensal:
+
+    Data_m = EDATE(Premissas!B4, m - 1)
+
+O horizonte de comparacao fica em Premissas!B39.
+
+O motor mensal suporta ate 480 meses. O resumo compara os fluxos ate o horizonte escolhido.
+
+
+2.2. Modelo nominal
+
+O modelo e nominal. Isso significa que financiamento, consorcio, aluguel, valorizacao do imovel, rentabilidade de oportunidade e fluxos de caixa sao calculados em moeda nominal.
+
+A inflacao nao entra no motor de caixa, nao altera parcelas, nao altera aluguel, nao altera deficit nao coberto, nao altera VPL nominal e nao altera gap em valor futuro.
+
+A inflacao e usada somente para apresentar uma conversao de patrimonio nominal para "R$ de hoje".
+
+Formula:
+
+    Inflacao mensal equivalente = (1 + inflacao anual)^(1/12) - 1
+    Fator inflacao acumulada = (1 + inflacao anual)^(horizonte_meses / 12)
+    Patrimonio em R$ de hoje = Patrimonio nominal / Fator inflacao acumulada
+
+Na planilha:
+
+    Premissas!B68 = (1 + B67)^(1/12) - 1
+    Premissas!B69 = (1 + B67)^(B39/12)
+
+
+2.3. Taxas mensais equivalentes
+
+Taxas anuais sao convertidas para taxa mensal equivalente composta.
+
+Formula generica:
+
+    taxa_mensal = (1 + taxa_anual)^(1/12) - 1
+
+Na planilha:
+
+    Juros financiamento mensal = Premissas!B15 = (1 + B14)^(1/12) - 1
+    TR mensal = Premissas!B17 = (1 + B16)^(1/12) - 1
+    Rentabilidade mensal = Premissas!B41 = (1 + B40)^(1/12) - 1
+    Inflacao mensal = Premissas!B68 = (1 + B67)^(1/12) - 1
+
+
+3. PREMISSAS PRINCIPAIS
+
+3.1. Entrada e valor financiado
+
+O valor do imovel novo fica em Premissas!B6.
+
+O percentual de entrada fica em Premissas!B7.
+
+Formulas:
+
+    Entrada em R$ = Valor do imovel novo * Percentual de entrada
+    Valor financiado = Valor do imovel novo - Entrada em R$
+
+Na planilha:
+
+    Premissas!B8  = B6 * B7
+    Premissas!B10 = B6 - B8
+
+O saldo da venda apos entrada e uma ponte informativa:
+
+    Premissas!B9 = B5 - B8
+
+Essa ponte nao substitui a reserva efetivamente usada no motor. O motor usa a reserva informada em Premissas!B43.
+
+
+3.2. Reserva e caixa livre mensal
+
+Reserva inicial:
+
+    Premissas!B43
+
+Caixa livre mensal antes dos fluxos do imovel:
+
+    Premissas!B42
+
+O caixa livre mensal e comum a todas as estrategias. Ele entra antes de parcelas, entrada, aluguel pago, aluguel recebido, consorcio e lances.
+
+Reserva minima recomendada:
+
+    Premissas!B77 = Premissas!B44
+
+Maior entrada entre estrategias:
+
+    Premissas!B44 = MAX(Premissas!B8, 'Consorcio Direto'!B44)
+
+Essa verificacao existe para evitar comparar alternativas que exigem entradas iniciais diferentes sem caixa disponivel para suporta-las.
+
+
+3.3. Valor do imovel no tempo
+
+O valor do imovel no mes m usa a valorizacao anual em Premissas!B66.
+
+Formula:
+
+    Valor_imovel_m = Valor_imovel_inicial * (1 + valorizacao_anual)^(m/12)
+
+Na aba Motor Caixa:
+
+    Valor imovel no mes = Premissas!B6 * (1 + Premissas!B66)^(Mes/12)
+
+Por padrao, a valorizacao do imovel esta em 0% a.a., para manter a comparacao conservadora.
+
+
+4. FINANCIAMENTO SAC PURO
+
+A aba Financiamento calcula um financiamento SAC com TR.
+
+4.1. Ordem de calculo mensal
+
+Para cada mes m:
+
+1. O saldo inicial do mes e o saldo final do mes anterior.
+2. A TR mensal corrige o saldo inicial.
+3. Os juros incidem sobre o saldo corrigido.
+4. A amortizacao ordinaria e calculada pelo saldo corrigido dividido pelos meses restantes.
+5. O seguro mensal entra enquanto houver saldo devedor.
+6. A prestacao total e soma de amortizacao, juros e seguro.
+7. O saldo final e o saldo corrigido menos amortizacao.
+
+
+4.2. Formulas principais
+
+Na aba Financiamento:
+
+    Saldo inicial_m =
+        se m = 1: Premissas!B10
+        senao: Saldo final_(m-1)
+
+    Correcao TR_m = se Saldo inicial_m > 0:
+        Saldo inicial_m * Premissas!B17
+        senao 0
+
+    Saldo corrigido_m = Saldo inicial_m + Correcao TR_m
+
+    Meses restantes_m = Premissas!B13 - m + 1
+
+    Amortizacao_m = se Saldo corrigido_m > 0:
+        MIN(Saldo corrigido_m, Saldo corrigido_m / Meses restantes_m)
+        senao 0
+
+    Juros_m = se Saldo corrigido_m > 0:
+        Saldo corrigido_m * Premissas!B15
+        senao 0
+
+    Seguro_m = se Saldo corrigido_m > 0:
+        Premissas!B18
+        senao 0
+
+    Prestacao total_m = Amortizacao_m + Juros_m + Seguro_m
+
+    Saldo final_m = MAX(0, Saldo corrigido_m - Amortizacao_m)
+
+
+4.3. Logica financeira
+
+O modelo SAC reduz o saldo devedor por amortizacoes mensais. A amortizacao ordinaria e recalculada com base no saldo corrigido e nos meses restantes, de modo que o financiamento termine zerado no prazo informado.
+
+A TR corrige o saldo antes dos juros e antes da amortizacao. Os juros incidem sobre o saldo ja corrigido.
+
+
+5. FINANCIAMENTO COM AMORTIZACAO POR CAIXA LIVRE
+
+A aba Amortizacao simula o mesmo financiamento SAC, mas usando a sobra entre caixa livre mensal e prestacao ordinaria para amortizacao extra.
+
+5.1. Regra central
+
+A amortizacao extra nao usa fluxo de consorcio como referencia.
+
+Ela usa apenas:
+
+    Caixa livre mensal comum - Prestacao ordinaria SAC do proprio mes
+
+Como a prestacao SAC diminui ao longo do tempo, a sobra tende a aumentar mes a mes.
+
+
+5.2. Formulas principais
+
+Na aba Amortizacao:
+
+    Caixa livre mensal_m =
+        se houver saldo: Premissas!B35
+        senao 0
+
+    Prestacao ordinaria_m = Amortizacao ordinaria_m + Juros_m + Seguro_m
+
+    Sobra para amortizar_m =
+        se houver saldo: MAX(0, Caixa livre mensal_m - Prestacao ordinaria_m)
+        senao 0
+
+    Amortizacao extra_m =
+        se Saldo corrigido_m - Amortizacao ordinaria_m > 0:
+            MIN(Saldo corrigido_m - Amortizacao ordinaria_m, Sobra para amortizar_m)
+        senao 0
+
+    Desembolso total_m =
+        Prestacao ordinaria_m + Amortizacao extra_m
+
+    Saldo final_m =
+        MAX(0, Saldo corrigido_m - Amortizacao ordinaria_m - Amortizacao extra_m)
+
+    Status_m =
+        se Saldo inicial_m = 0: "Encerrado"
+        senao se Saldo final_m = 0: "Quitado"
+        senao: "Aberto"
+
+
+5.3. Logica financeira
+
+A estrategia 2 representa uma pessoa que compromete ate o caixa livre mensal informado para acelerar a quitacao.
+
+Se a prestacao ordinaria for maior que o caixa livre mensal, nao existe amortizacao extra naquele mes. A eventual inviabilidade de caixa nao e resolvida na aba Amortizacao; ela aparece no Motor Caixa, que verifica se a reserva consegue absorver o deficit total da estrategia.
+
+
+6. CONSORCIO COMO INTERVENIENTE QUITANTE
+
+A estrategia 3 combina financiamento no inicio com consorcio usado para quitar o saldo devedor no mes de contemplacao.
+
+6.1. Dimensionamento da carta
+
+O modelo primeiro calcula o saldo do financiamento no mes de contemplacao:
+
+    Premissas!B29 =
+        se Mes contemplacao <= Prazo financiamento:
+            INDEX(Financiamento!M6:M485, Mes contemplacao)
+        senao 0
+
+Depois calcula o fator de reajuste da carta ate a contemplacao:
+
+    Premissas!B28 = (1 + Reajuste consorcio anual)^INT((Mes contemplacao - 1)/12)
+
+Entao dimensiona a carta inicial:
+
+    Carta inicial contratada = Saldo financiamento no mes contemplacao / Fator reajuste
+
+Na planilha:
+
+    Premissas!B30 = B29 / B28
+
+Credito atualizado no mes de contemplacao:
+
+    Premissas!B31 = B30 * B28
+
+Parcela inicial do consorcio:
+
+    Premissas!B32 = B30 * (1 + Taxas totais sobre credito) / Prazo consorcio
+
+
+6.2. Cronograma mensal
+
+Na aba Consorcio IQ:
+
+    Fator reajuste_m = (1 + Premissas!B26)^INT((m - 1)/12)
+
+    Credito atualizado_m = Premissas!B30 * Fator reajuste_m
+
+    Parcela consorcio_m =
+        se m <= Prazo consorcio:
+            Premissas!B32 * Fator reajuste_m
+        senao 0
+
+    Prestacao financiamento_m =
+        se m <= Mes contemplacao e m <= Prazo financiamento:
+            INDEX(Financiamento!J6:J485, m)
+        senao 0
+
+    Saldo apos prestacao_m =
+        se m <= Mes contemplacao e m <= Prazo financiamento:
+            INDEX(Financiamento!M6:M485, m)
+        senao 0
+
+    Carta usada_m =
+        se m = Mes contemplacao:
+            MIN(Credito atualizado_m, Saldo apos prestacao_m)
+        senao 0
+
+    Desembolso cliente_m =
+        Parcela consorcio_m + Prestacao financiamento_m
+
+
+6.3. Logica financeira
+
+No mes da contemplacao, o cliente ainda paga a prestacao normal daquele mes e depois usa a carta atualizada para quitar o saldo restante.
+
+A carta inicial e calculada para que a carta atualizada cubra o saldo devedor projetado no mes de contemplacao.
+
+
+7. CONSORCIO DIRETO
+
+A estrategia 4 simula comprar via consorcio direto, sem financiamento.
+
+7.1. Lances
+
+O modelo permite tres componentes:
+
+1. Lance embutido.
+2. Lance livre.
+3. Lance fixo.
+
+O lance embutido reduz o credito liquido disponivel para compra, mas nao sai diretamente do caixa do cliente.
+
+Os lances livre/fixo exigem recursos do cliente, exceto a parte compensada pelo lance embutido.
+
+Formulas:
+
+    Lance embutido efetivo =
+        se "Usar lance embutido?" = "Sim": percentual lance embutido
+        senao 0
+
+    Lances livre/fixo efetivos =
+        se "Usar lance livre?" = "Sim": percentual lance livre
+        +
+        se "Usar lance fixo?" = "Sim": percentual lance fixo
+
+    Descapitalizacao do cliente =
+        MAX(0, Lances livre/fixo efetivos - Lance embutido efetivo)
+
+Na planilha:
+
+    Consorcio Direto!B37 = IF(B31="Sim", B32, 0)
+    Consorcio Direto!B38 = IF(B33="Sim", B34, 0) + IF(B35="Sim", B36, 0)
+    Consorcio Direto!B39 = MAX(0, B38 - B37)
+
+
+7.2. Carta e credito liquido
+
+Fator de reajuste ate contemplacao:
+
+    Consorcio Direto!B40 = (1 + B28)^INT((B29 - 1)/12)
+
+Carta inicial contratada:
+
+    Consorcio Direto!B41 = Valor do imovel / (Fator reajuste * (1 - Lance embutido efetivo))
+
+Credito bruto na contemplacao:
+
+    Consorcio Direto!B42 = Carta inicial contratada * Fator reajuste
+
+Credito liquido para compra:
+
+    Consorcio Direto!B43 = Credito bruto na contemplacao * (1 - Lance embutido efetivo)
+
+Lance com recursos do cliente:
+
+    Consorcio Direto!B44 = Credito bruto na contemplacao * Descapitalizacao do cliente
+
+Parcela inicial do consorcio:
+
+    Consorcio Direto!B45 = Carta inicial contratada * (1 + Taxas totais) / Prazo consorcio
+
+
+7.3. Cronograma mensal
+
+Na aba Consorcio Direto:
+
+    Fator reajuste_m = (1 + Reajuste anual)^INT((m - 1)/12)
+
+    Parcela consorcio_m =
+        se m <= Prazo consorcio:
+            Parcela inicial * Fator reajuste_m
+        senao 0
+
+    Lance cliente_m =
+        se m = Mes contemplacao:
+            Lance com recursos do cliente
+        senao 0
+
+    Desembolso total_m = Parcela consorcio_m + Lance cliente_m
+
+    Credito bruto_m =
+        se m = Mes contemplacao:
+            Credito bruto na contemplacao
+        senao 0
+
+    Credito liquido_m =
+        se m = Mes contemplacao:
+            Credito liquido para compra
+        senao 0
+
+
+7.4. Logica financeira
+
+O consorcio direto so entrega o imovel economicamente na contemplacao. Antes disso, a estrategia pode ter parcelas e eventualmente aluguel de espera, mas nao tem o imovel como ativo no patrimonio.
+
+
+8. ALUGUEL E FINALIDADE DO IMOVEL
+
+O campo Premissas!B47 define a finalidade:
+
+    "Moradia propria"
+    "Investimento para aluguel"
+
+A mesma pessoa escolhe uma entre as quatro alternativas. Por isso, o aluguel deve ser simetrico: nenhuma estrategia deve ser beneficiada por pagar ou receber aluguel em momento incoerente.
+
+
+8.1. Moradia propria
+
+No modo moradia propria:
+
+    Aluguel recebido = 0
+
+O aluguel pago entra apenas enquanto a estrategia ainda nao permite morar no imovel comprado.
+
+Para financiamento, amortizacao e IQ:
+
+    Mes acesso = MAX(Mes aquisicao via financiamento, Mes disponibilidade/chaves)
+
+    Aluguel pago_m =
+        se m < Mes acesso:
+            Aluguel pago base_m
+        senao 0
+
+Para consorcio direto:
+
+    Mes acesso = MAX(Mes contemplacao consorcio direto, Mes disponibilidade/chaves)
+
+    Aluguel pago_m =
+        se m < Mes acesso:
+            Aluguel pago base_m
+        senao 0
+
+
+8.2. Investimento para aluguel
+
+No modo investimento:
+
+    Aluguel pago = 0
+
+O aluguel recebido entra apenas depois que a estrategia tem acesso economico ao imovel e o imovel esta disponivel.
+
+Para financiamento, amortizacao e IQ:
+
+    Inicio aluguel recebido = MAX(Premissas!B48, Premissas!B49)
+
+Para consorcio direto:
+
+    Inicio aluguel recebido = MAX('Consorcio Direto'!B29, Premissas!B49)
+
+Formula mensal no motor:
+
+    Aluguel recebido_m =
+        se Uso = "Investimento para aluguel" e m >= Mes acesso:
+            Aluguel recebido liquido base_m
+        senao 0
+
+
+8.3. Reajuste do aluguel
+
+Aluguel pago base:
+
+    Premissas!B54 = Valor imovel * percentual aluguel pago
+
+Aluguel recebido bruto:
+
+    Premissas!B56 = Valor imovel * percentual aluguel recebido bruto
+
+Aluguel recebido liquido:
+
+    Premissas!B64 = B56 * (1 - SUM(B58:B63))
+
+Reajuste anual por degrau:
+
+    Aluguel pago base_m = B54 * (1 + B57)^INT((m - 1)/12)
+
+    Aluguel recebido liquido base_m = B64 * (1 + B57)^INT((m - 1)/12)
+
+
+9. MOTOR DE CAIXA
+
+A aba Motor Caixa consolida todos os fluxos mensais e calcula viabilidade e patrimonio.
+
+Ela e o centro decisorio do modelo.
+
+
+9.1. Bloco comum
+
+Para cada mes m:
+
+    Caixa livre mensal_m =
+        se m <= horizonte:
+            Premissas!B42
+        senao 0
+
+    Valor imovel_m =
+        Premissas!B6 * (1 + Premissas!B66)^(m/12)
+
+    FV base sem compra_m =
+        se m = 1:
+            Reserva inicial + Caixa livre mensal_m
+        senao:
+            FV base_(m-1) * (1 + rentabilidade mensal) + Caixa livre mensal_m
+
+A base sem compra representa a alternativa de nao comprar e investir reserva + caixa livre mensal pela taxa de oportunidade.
+
+
+9.2. Bloco de cada estrategia
+
+Cada estrategia tem as mesmas colunas logicas:
+
+    Entrada/lance
+    Parcela/desembolso
+    Aluguel pago
+    Aluguel recebido
+    Saidas totais
+    Entradas totais
+    Fluxo livre
+    Saldo antes ajuste
+    Deficit nao coberto mes
+    Deficit nao coberto VF
+    Saldo investido
+    Saldo devedor
+    Patrimonio imovel
+    Patrimonio bruto
+    Patrimonio
+    Status
+
+
+9.3. Saidas e entradas
+
+Formula:
+
+    Saidas totais_m = Entrada/lance_m + Parcela/desembolso_m + Aluguel pago_m
+
+    Entradas totais_m = Aluguel recebido_m
+
+    Fluxo livre_m = Caixa livre mensal_m + Entradas totais_m - Saidas totais_m
+
+Interpretacao:
+
+Se o fluxo livre for positivo, ele aumenta o saldo investido.
+
+Se o fluxo livre for negativo, ele consome saldo investido/reserva. Se o saldo nao for suficiente, nasce deficit nao coberto.
+
+
+9.4. Saldo investido e deficit
+
+No mes 1:
+
+    Saldo antes ajuste_1 = Reserva inicial + Fluxo livre_1
+
+Nos meses seguintes:
+
+    Saldo antes ajuste_m =
+        Saldo investido_(m-1) * (1 + rentabilidade mensal) + Fluxo livre_m
+
+Deficit nao coberto do mes:
+
+    Deficit mes_m = MAX(0, -Saldo antes ajuste_m)
+
+Saldo investido:
+
+    Saldo investido_m = MAX(0, Saldo antes ajuste_m)
+
+Deficit nao coberto em valor futuro:
+
+    Deficit VF_1 = Deficit mes_1
+
+    Deficit VF_m =
+        Deficit VF_(m-1) * (1 + rentabilidade mensal) + Deficit mes_m
+
+
+9.5. Por que o deficit e acumulado em valor futuro
+
+O deficit nao coberto pode ocorrer em meses diferentes. Para comparar no horizonte, o modelo acumula esse deficit pela mesma taxa de oportunidade usada para investimentos.
+
+Mas o deficit nao e tratado como "capital adicional permitido". Ele e um diagnostico de inviabilidade.
+
+Se a estrategia fica sem caixa e sem reserva, ela deixa de ser uma alternativa executavel.
+
+
+9.6. Patrimonio
+
+Patrimonio bruto interno:
+
+    Patrimonio bruto_m = Saldo investido_m + Patrimonio imovel_m - Saldo devedor_m
+
+Patrimonio decisorio:
+
+    Patrimonio_m =
+        se Deficit VF_m > 1:
+            "Inviavel"
+        senao:
+            Patrimonio bruto_m
+
+Status:
+
+    Status_m =
+        se Deficit VF_m > 1:
+            "Inviavel"
+        senao:
+            "OK"
+
+O limite de 1 real funciona como tolerancia pratica para evitar ruido de arredondamento.
+
+
+9.7. Patrimonio imovel e saldo devedor por estrategia
+
+Estrategia 1 - Financiamento sem amortizacao:
+
+    Entrada/lance = entrada do financiamento no mes de aquisicao.
+    Parcela/desembolso = prestacao SAC da aba Financiamento.
+    Saldo devedor = saldo final da aba Financiamento.
+    Patrimonio imovel = valor do imovel a partir do mes de aquisicao via financiamento.
+
+Estrategia 2 - Financiamento com amortizacao:
+
+    Entrada/lance = entrada do financiamento no mes de aquisicao.
+    Parcela/desembolso = desembolso total da aba Amortizacao.
+    Saldo devedor = saldo final da aba Amortizacao.
+    Patrimonio imovel = valor do imovel a partir do mes de aquisicao via financiamento.
+
+Estrategia 3 - Financiamento + consorcio IQ:
+
+    Entrada/lance = entrada do financiamento no mes de aquisicao.
+    Parcela/desembolso = desembolso cliente da aba Consorcio IQ.
+    Saldo devedor = saldo do financiamento ate o mes anterior a contemplacao; depois zero.
+    Patrimonio imovel = valor do imovel a partir do mes de aquisicao via financiamento.
+
+Estrategia 4 - Consorcio direto:
+
+    Entrada/lance = lance com recursos do cliente no mes de contemplacao.
+    Parcela/desembolso = parcela do consorcio direto.
+    Saldo devedor = zero.
+    Patrimonio imovel = valor do imovel a partir do mes de contemplacao.
+
+
+10. RESUMO EXECUTIVO
+
+A aba Resumo puxa o resultado do Motor Caixa no horizonte informado.
+
+10.1. Saidas nominais totais
+
+Soma todas as saidas mensais da estrategia ate o horizonte:
+
+    Saidas totais = SUMIFS(Saidas mensais, Mes, "<=" & Horizonte)
+
+Inclui entrada/lance, parcelas/desembolsos e aluguel pago quando aplicavel.
+
+
+10.2. Entradas nominais totais
+
+Soma todas as entradas mensais da estrategia ate o horizonte:
+
+    Entradas totais = SUMIFS(Entradas mensais, Mes, "<=" & Horizonte)
+
+Na versao atual, a entrada relevante e aluguel recebido liquido quando o modo e investimento para aluguel.
+
+
+10.3. Fluxo liquido nominal acumulado
+
+Formula:
+
+    Fluxo liquido nominal acumulado = Entradas nominais totais - Saidas nominais totais
+
+Esse indicador mostra caixa acumulado bruto, mas nao substitui patrimonio, VPL ou gap, pois nao considera saldo investido, imovel, divida e oportunidade.
+
+
+10.4. Deficit nao coberto VF
+
+Puxa do Motor Caixa o deficit nao coberto acumulado ate o horizonte.
+
+Se for maior que 1, a estrategia e marcada como Inviavel.
+
+
+10.5. Patrimonio nominal
+
+Formula no Resumo:
+
+    Patrimonio nominal =
+        se Deficit nao coberto VF > 1:
+            "Inviavel"
+        senao:
+            Patrimonio bruto interno do Motor Caixa no horizonte
+
+O Resumo nao mostra patrimonio bruto separado porque ele nao e metrica decisoria quando a estrategia e inviavel.
+
+
+10.6. Patrimonio em R$ de hoje
+
+Formula:
+
+    Patrimonio em R$ de hoje =
+        se Deficit nao coberto VF > 1:
+            "Inviavel"
+        senao:
+            Patrimonio nominal / Premissas!B69
+
+Essa e apenas uma conversao de apresentacao. A inflacao nao entra no motor nominal.
+
+
+10.7. Gap VF vs base
+
+O gap compara a estrategia com a alternativa base de nao comprar e investir reserva + caixa livre mensal.
+
+Formula:
+
+    Gap VF vs base =
+        se estrategia inviavel:
+            "Inviavel"
+        senao:
+            Patrimonio nominal - FV base sem compra no horizonte
+
+
+10.8. VPL vs base
+
+O VPL vs base desconta o gap em valor futuro pela taxa de oportunidade nominal.
+
+Formula:
+
+    VPL vs base =
+        se estrategia inviavel:
+            "Inviavel"
+        senao:
+            Gap VF vs base / (1 + rentabilidade mensal)^horizonte
+
+Na planilha, a formula e escrita como:
+
+    (Patrimonio nominal - FV base sem compra) / (1 + Premissas!B41)^Premissas!B39
+
+O VPL nao e uma soma de fluxos descontados individualmente. Ele e o valor presente do diferencial de patrimonio futuro contra a alternativa base.
+
+
+10.9. Status
+
+Formula:
+
+    Status =
+        se Deficit nao coberto VF > 1:
+            "Inviavel"
+        senao:
+            "OK"
+
+Regra de decisao:
+
+Primeiro veja Status. Se Status = Inviavel, a estrategia deve ser descartada antes de comparar patrimonio, VPL ou gap.
+
+
+11. GRAFICO DO RESUMO
+
+O grafico usa apenas estrategias viaveis.
+
+Formula auxiliar:
+
+    Valor plotado =
+        se Status = "Inviavel":
+            vazio
+        senao:
+            Patrimonio em R$ de hoje
+
+Assim, uma estrategia inviavel nao aparece como barra positiva por causa de patrimonio bruto teorico.
+
+
+12. CHECKS DO MODELO
+
+A aba Checks valida coerencia operacional e financeira.
+
+Principais checks:
+
+1. Financiamento puro termina zerado:
+
+    INDEX(Financiamento!M6:M485, Prazo financiamento) deve ser aproximadamente zero.
+
+2. Carta IQ cobre saldo no mes de contemplacao:
+
+    Credito atualizado na contemplacao deve bater com o saldo devedor projetado.
+
+3. Consorcio direto cobre o imovel:
+
+    Credito liquido do consorcio direto >= valor do imovel.
+
+4. Reserva cobre maior entrada/lance:
+
+    Reserva inicial >= maior entrada/lance relevante.
+
+5. Motor: saldo investido nao fica negativo:
+
+    O saldo investido e truncado em zero; deficit nao coberto registra inviabilidade.
+
+6. Patrimonio nominal bate formula:
+
+    Quando executavel:
+
+        Patrimonio nominal = Saldo investido + Patrimonio imovel - Saldo devedor
+
+7. Patrimonio bate status:
+
+    Se ha deficit nao coberto, patrimonio e patrimonio em R$ de hoje devem mostrar "Inviavel".
+
+8. Deficit nao coberto marca inviabilidade:
+
+    Status deve ser "Inviavel" exatamente quando Deficit nao coberto VF > 1.
+
+9. Aluguel pago somente em moradia:
+
+    No modo investimento, soma de aluguel pago deve ser zero.
+
+10. Aluguel recebido somente em investimento:
+
+    No modo moradia, soma de aluguel recebido deve ser zero.
+
+11. Consorcio direto sem aluguel recebido antes de contemplacao/chaves:
+
+    Estrategia 4 so recebe aluguel apos MAX(contemplacao direta, disponibilidade).
+
+12. Financiamento/IQ recebem aluguel no mes de acesso:
+
+    Estrategias 1, 2 e 3 recebem aluguel apenas a partir de MAX(aquisicao via financiamento, disponibilidade).
+
+13. VPL e Gap usam a mesma base temporal:
+
+    Gap VF deve ser o VPL capitalizado pela taxa de oportunidade ate o horizonte.
+
+14. Inflacao nao entra no motor:
+
+    A inflacao e usada apenas para apresentacao em R$ de hoje.
+
+15. Amortizacao extra:
+
+    Amortizacao extra deve ser o menor entre sobra de caixa e saldo amortizavel.
+
+
+13. ORDEM RECOMENDADA DE LEITURA DOS RESULTADOS
+
+1. Verifique Status.
+
+   Se aparecer "Inviavel", descarte a estrategia. Ela exige caixa que a pessoa nao tem.
+
+2. Compare Patrimonio em R$ de hoje.
+
+   Use apenas entre estrategias viaveis. Essa metrica mostra patrimonio equivalente em poder de compra atual.
+
+3. Compare VPL vs base.
+
+   Mostra quanto a estrategia ganha ou perde, em valor presente, contra a alternativa de nao comprar e investir.
+
+4. Compare Gap VF vs base.
+
+   Mostra o diferencial em valor futuro no horizonte.
+
+5. Leia Saidas nominais totais e Fluxo liquido nominal acumulado como diagnostico de desembolso, nao como ranking principal.
+
+
+14. LIMITACOES DO MODELO
+
+O modelo nao inclui todos os custos ou riscos possiveis.
+
+Nao estao modelados de forma detalhada:
+
+    ITBI.
+    Custos de cartorio.
+    INCC de obra.
+    Imposto de venda do imovel.
+    Tributacao completa de aluguel.
+    Risco de nao contemplacao no mes preset.
+    Mudancas futuras nas regras do grupo de consorcio.
+    Risco de credito ou recusa de financiamento.
+
+O modelo tambem nao mistura nominal e real. A logica economica principal fica nominal; a coluna em R$ de hoje e apenas uma conversao de apresentacao.
+
+
+15. RESUMO DA LOGICA DECISORIA
+
+A estrategia vencedora precisa passar por dois filtros:
+
+1. Filtro de viabilidade de caixa:
+
+    Reserva + caixa livre mensal precisam suportar todos os desembolsos ao longo do tempo.
+
+2. Filtro economico:
+
+    Entre as estrategias viaveis, comparar patrimonio, VPL e gap contra a alternativa base.
+
+Uma estrategia com patrimonio bruto teorico alto, mas com deficit nao coberto, nao e uma alternativa real para a pessoa. Por isso, o modelo mostra "Inviavel" no Resumo e nao usa esse patrimonio no ranking.

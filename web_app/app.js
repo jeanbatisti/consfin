@@ -358,6 +358,8 @@ function buildStrategyRows(p, sharedRows, schedules, strategyId) {
   const rows = [];
   let invested = 0;
   let capitalVf = 0;
+  let totalUncoveredDeficit = 0;
+  let firstDeficitMonth = null;
   const entry = p.propertyValue * p.entryPct;
   const finAvailability = Math.max(p.acquisitionFinMonth, p.availabilityMonth);
   const directAvailability = Math.max(p.directMonth, p.availabilityMonth);
@@ -405,6 +407,10 @@ function buildStrategyRows(p, sharedRows, schedules, strategyId) {
     const freeFlow = shared.cashFree + inputs - outputs;
     const beforeAdjustment = month === 1 ? p.reserve + freeFlow : invested * (1 + returnMonthly) + freeFlow;
     const capitalMonth = Math.max(0, -beforeAdjustment);
+    if (capitalMonth > 0.01 && firstDeficitMonth === null) {
+      firstDeficitMonth = month;
+    }
+    totalUncoveredDeficit += capitalMonth;
     capitalVf = month === 1 ? capitalMonth : capitalVf * (1 + returnMonthly) + capitalMonth;
     invested = Math.max(0, beforeAdjustment);
 
@@ -428,10 +434,36 @@ function buildStrategyRows(p, sharedRows, schedules, strategyId) {
       property,
       grossWorth,
       adjustedWorth,
+      firstDeficitMonth,
+      totalUncoveredDeficit,
     });
   }
 
   return rows;
+}
+
+function getInitialPaymentLines(id, schedules) {
+  if (id === "fin") {
+    return [{ label: "Financiamento", value: schedules.financing[0]?.payment || 0 }];
+  }
+
+  if (id === "amort") {
+    const first = schedules.amortization.rows[0] || {};
+    const lines = [{ label: "Financiamento", value: first.ordinaryPayment || 0 }];
+    if ((first.extraPayment || 0) > 0.01) {
+      lines.push({ label: "Amortização extra", value: first.extraPayment || 0 });
+    }
+    return lines;
+  }
+
+  if (id === "iq") {
+    return [
+      { label: "Financiamento", value: schedules.financing[0]?.payment || 0 },
+      { label: "Consórcio IQ", value: schedules.iq.installmentInitial || 0 },
+    ];
+  }
+
+  return [{ label: "Consórcio", value: schedules.direct.installmentInitial || 0 }];
 }
 
 function summarizeStrategy(p, sharedRows, strategyRows, schedules, id) {
@@ -439,10 +471,14 @@ function summarizeStrategy(p, sharedRows, strategyRows, schedules, id) {
   const final = strategyRows[horizon - 1];
   const totalOutputs = strategyRows.slice(0, horizon).reduce((sum, row) => sum + row.outputs, 0);
   const totalInputs = strategyRows.slice(0, horizon).reduce((sum, row) => sum + row.inputs, 0);
+  const horizonRows = strategyRows.slice(0, horizon);
+  const firstDeficitRow = horizonRows.find((row) => row.capitalMonth > 0.01);
+  const totalUncoveredDeficit = horizonRows.reduce((sum, row) => sum + row.capitalMonth, 0);
   const inflationFactor = Math.pow(1 + p.inflationPct, horizon / 12);
   const baseFv = sharedRows[horizon - 1].baseFv;
   const gapFv = final.adjustedWorth - baseFv;
   const entry = p.propertyValue * p.entryPct;
+  const isViable = final.capitalVf <= 1;
 
   const acquisitionMonth = id === "cons" ? p.directMonth : p.acquisitionFinMonth;
   const payoffMonth =
@@ -465,10 +501,14 @@ function summarizeStrategy(p, sharedRows, strategyRows, schedules, id) {
     acquisitionMonth,
     payoffMonth,
     entryOrInitial,
+    initialPaymentLines: getInitialPaymentLines(id, schedules),
     totalOutputs,
     totalInputs,
     netFlow: totalInputs - totalOutputs,
     capitalVf: final.capitalVf,
+    isViable,
+    firstDeficitMonth: firstDeficitRow?.month ?? null,
+    totalUncoveredDeficit,
     grossWorth: final.grossWorth,
     grossToday: final.grossWorth / inflationFactor,
     adjustedWorth: final.adjustedWorth,
@@ -494,9 +534,10 @@ function calculateScenario(rawInputs) {
     return summarizeStrategy(p, sharedRows, rows, schedules, id);
   });
 
-  const sorted = [...strategies].sort((a, b) => b.adjustedToday - a.adjustedToday);
-  const best = sorted[0];
-  const second = sorted[1];
+  const viableStrategies = strategies.filter((strategy) => strategy.isViable);
+  const sorted = [...viableStrategies].sort((a, b) => b.adjustedToday - a.adjustedToday);
+  const best = sorted[0] || null;
+  const second = sorted[1] || null;
   const entry = p.propertyValue * p.entryPct;
   const totalFees = p.consAdminPct + p.consReservePct + p.consInsurancePct;
 
@@ -505,6 +546,7 @@ function calculateScenario(rawInputs) {
     sharedRows,
     schedules,
     strategies,
+    viableStrategies,
     best,
     second,
     derived: {
@@ -552,6 +594,21 @@ function formatMonth(month) {
 function formatSignedCurrency(value) {
   const sign = value > 0 ? "+" : "";
   return `${sign}${formatCurrency(value)}`;
+}
+
+function formatStrategyPatrimony(strategy) {
+  return strategy.isViable ? formatPatrimony(strategy.adjustedToday) : "Inviável";
+}
+
+function formatInitialPaymentLines(strategy) {
+  return strategy.initialPaymentLines
+    .map((line) => `${line.label}: ${formatCurrency(line.value)}`)
+    .join("<br>");
+}
+
+function formatCashStatus(strategy) {
+  if (strategy.isViable) return "Viável";
+  return `Inviável no mês ${strategy.firstDeficitMonth || 1}`;
 }
 
 function parseCurrencyValue(value) {
@@ -626,13 +683,24 @@ function setDomState(state) {
 
 function renderHero(result) {
   const best = result.best;
+  if (!best) {
+    document.getElementById("bestStrategyName").textContent = "Nenhuma viável";
+    document.getElementById("bestAdjustedToday").textContent = "Inviável";
+    document.getElementById("bestNominalCost").textContent = "-";
+    document.getElementById("executiveInsight").textContent =
+      "Com o caixa livre mensal e a reserva informados, nenhuma alternativa se sustenta sem déficit não coberto. Aumente a reserva, o caixa mensal ou reduza os desembolsos antes de comparar patrimônio.";
+    return;
+  }
+
   document.getElementById("bestStrategyName").textContent = best.short;
   document.getElementById("bestAdjustedToday").textContent = formatPatrimony(best.adjustedToday);
   document.getElementById("bestNominalCost").textContent = formatCurrency(best.totalOutputs);
 
-  const gapToSecond = best.adjustedToday - result.second.adjustedToday;
+  const gapToSecond = result.second ? best.adjustedToday - result.second.adjustedToday : 0;
 
-  const insight = `${best.short} lidera por ${formatCurrency(gapToSecond)} em Patrimônio Acumulado contra a segunda alternativa. O custo estimado dessa estratégia é ${formatCurrency(best.totalOutputs)} ao longo do horizonte analisado.`;
+  const insight = result.second
+    ? `${best.short} lidera por ${formatCurrency(gapToSecond)} em Patrimônio Acumulado entre as alternativas viáveis. O custo estimado dessa estratégia é ${formatCurrency(best.totalOutputs)} ao longo do horizonte analisado.`
+    : `${best.short} é a única alternativa viável com o caixa livre mensal e a reserva informados. O custo estimado dessa estratégia é ${formatCurrency(best.totalOutputs)} ao longo do horizonte analisado.`;
   document.getElementById("executiveInsight").textContent = insight;
 }
 
@@ -642,31 +710,36 @@ function renderStrategyCards(result) {
 
   result.strategies.forEach((strategy, index) => {
     const card = document.createElement("article");
-    card.className = `strategy-card${strategy.id === result.best.id ? " is-best" : ""}`;
+    const isBest = result.best && strategy.id === result.best.id;
+    card.className = `strategy-card${isBest ? " is-best" : ""}${strategy.isViable ? "" : " is-infeasible"}`;
+    const badgeClass = strategy.isViable ? (isBest ? "best" : "") : "infeasible";
+    const badgeText = strategy.isViable ? (isBest ? "Indicada" : `Cenário ${index + 1}`) : "Inviável";
 
     card.innerHTML = `
       <div class="strategy-title">
-        <span class="badge ${strategy.id === result.best.id ? "best" : ""}">
-          ${strategy.id === result.best.id ? "Indicada" : `Cenário ${index + 1}`}
-        </span>
+        <span class="badge ${badgeClass}">${badgeText}</span>
         <h3>${strategy.name}</h3>
       </div>
       <div class="metric-list">
         <div class="metric">
           <span>Patrimônio Acumulado</span>
-          <strong>${formatPatrimony(strategy.adjustedToday)}</strong>
+          <strong class="${strategy.isViable ? "" : "infeasible"}">${formatStrategyPatrimony(strategy)}</strong>
         </div>
         <div class="metric">
-          <span>Custo</span>
-          <strong>${formatCurrency(strategy.totalOutputs)}</strong>
+          <span>Parcela inicial</span>
+          <strong class="multi-line">${formatInitialPaymentLines(strategy)}</strong>
         </div>
         <div class="metric">
           <span>Entrada ou lance</span>
           <strong>${formatCurrency(strategy.entryOrInitial)}</strong>
         </div>
         <div class="metric">
-          <span>Aquisição</span>
-          <strong>${formatMonth(strategy.acquisitionMonth)}</strong>
+          <span>Status de caixa</span>
+          <strong class="${strategy.isViable ? "" : "infeasible"}">${formatCashStatus(strategy)}</strong>
+        </div>
+        <div class="metric">
+          <span>Déficit não coberto</span>
+          <strong>${strategy.isViable ? "-" : formatCurrency(strategy.totalUncoveredDeficit)}</strong>
         </div>
       </div>
     `;
@@ -678,25 +751,25 @@ function renderStrategyCards(result) {
 function renderBarChart(result) {
   const container = document.getElementById("barChart");
   container.innerHTML = "";
-  const values = result.strategies.map((strategy) => strategy.adjustedToday);
+  const values = result.strategies.filter((strategy) => strategy.isViable).map((strategy) => strategy.adjustedToday);
   const maxAbs = Math.max(1, ...values.map((value) => Math.abs(value)));
 
   result.strategies.forEach((strategy) => {
     const row = document.createElement("div");
-    row.className = "bar-row";
-    const width = Math.max(2, Math.abs(strategy.adjustedToday) / maxAbs * 100);
-    const isBest = strategy.id === result.best.id;
+    row.className = `bar-row${strategy.isViable ? "" : " is-infeasible"}`;
+    const width = strategy.isViable ? Math.max(2, Math.abs(strategy.adjustedToday) / maxAbs * 100) : 0;
+    const isBest = result.best && strategy.id === result.best.id;
     const isNegative = strategy.adjustedToday < 0;
 
     row.innerHTML = `
       <div class="bar-label">${strategy.short}</div>
       <div class="bar-track">
         <div
-          class="bar-fill ${isBest ? "is-best" : ""} ${isNegative ? "is-negative" : ""}"
+          class="bar-fill ${isBest ? "is-best" : ""} ${isNegative ? "is-negative" : ""} ${strategy.isViable ? "" : "is-infeasible"}"
           style="width: ${width}%"
         ></div>
       </div>
-      <div class="bar-value">${formatPatrimony(strategy.adjustedToday)}</div>
+      <div class="bar-value">${formatStrategyPatrimony(strategy)}</div>
     `;
     container.appendChild(row);
   });
@@ -716,9 +789,26 @@ function renderLineChart(result) {
   const padding = { top: 22, right: 22, bottom: 34, left: 54 };
   const horizon = result.inputs.horizonMonths;
   const sampleStep = Math.max(1, Math.floor(horizon / 72));
+  const drawableStrategies = result.strategies.filter((strategy) => strategy.isViable);
+  const legend = document.getElementById("lineLegend");
+  legend.innerHTML = "";
+
+  if (drawableStrategies.length === 0) {
+    const notice = svgEl("text", {
+      x: 54,
+      y: 150,
+      fill: "#77746b",
+      "font-size": "15",
+    });
+    notice.textContent = "Nenhuma estratégia viável com o caixa e a reserva informados.";
+    svg.appendChild(notice);
+    legend.innerHTML = '<span class="legend-item">Ajuste caixa mensal, reserva ou desembolsos.</span>';
+    return;
+  }
+
   const allPoints = [];
 
-  result.strategies.forEach((strategy) => {
+  drawableStrategies.forEach((strategy) => {
     for (let index = 0; index < horizon; index += sampleStep) {
       allPoints.push(strategy.rows[index].adjustedWorth);
     }
@@ -799,7 +889,7 @@ function renderLineChart(result) {
   xEnd.textContent = `mês ${horizon}`;
   svg.appendChild(xEnd);
 
-  result.strategies.forEach((strategy) => {
+  drawableStrategies.forEach((strategy) => {
     const points = [];
     for (let index = 0; index < horizon; index += sampleStep) {
       const month = index + 1;
@@ -811,15 +901,13 @@ function renderLineChart(result) {
       points: points.join(" "),
       fill: "none",
       stroke: strategyColors[strategy.id],
-      "stroke-width": strategy.id === result.best.id ? "4" : "2.5",
+      "stroke-width": result.best && strategy.id === result.best.id ? "4" : "2.5",
       "stroke-linejoin": "round",
       "stroke-linecap": "round",
     }));
   });
 
-  const legend = document.getElementById("lineLegend");
-  legend.innerHTML = "";
-  result.strategies.forEach((strategy) => {
+  drawableStrategies.forEach((strategy) => {
     const item = document.createElement("span");
     item.className = "legend-item";
     item.innerHTML = `
@@ -839,9 +927,11 @@ function renderComparisonRows(result) {
     row.innerHTML = `
       <td><strong>${strategy.name}</strong><br><span class="muted-text">${strategy.observation}</span></td>
       <td>${formatCurrency(strategy.entryOrInitial)}</td>
+      <td>${formatInitialPaymentLines(strategy)}</td>
       <td>${formatMonth(strategy.acquisitionMonth)}</td>
       <td>${formatCurrency(strategy.totalOutputs)}</td>
-      <td>${formatCurrency(strategy.adjustedToday)}</td>
+      <td>${formatStrategyPatrimony(strategy)}</td>
+      <td>${formatCashStatus(strategy)}</td>
     `;
     tbody.appendChild(row);
   });
@@ -874,8 +964,11 @@ function renderProposal(result) {
   const best = result.best;
   const second = result.second;
   const p = result.inputs;
-  const gap = best.adjustedToday - second.adjustedToday;
-  const conclusion = `${best.name} aparece como a alternativa mais eficiente no cenário informado, com ${formatCurrency(best.adjustedToday)} de Patrimônio Acumulado e vantagem de ${formatCurrency(gap)} sobre ${second.short}. A decisão deve considerar capacidade de caixa, risco de contemplação, regras do grupo e validação de crédito.`;
+  const conclusion = best
+    ? second
+      ? `${best.name} aparece como a alternativa mais eficiente entre as opções viáveis, com ${formatCurrency(best.adjustedToday)} de Patrimônio Acumulado e vantagem de ${formatCurrency(best.adjustedToday - second.adjustedToday)} sobre ${second.short}. A decisão deve considerar capacidade de caixa, risco de contemplação, regras do grupo e validação de crédito.`
+      : `${best.name} é a única alternativa viável no cenário informado, com ${formatCurrency(best.adjustedToday)} de Patrimônio Acumulado. As demais exigem déficit não coberto e não devem ser recomendadas com esse caixa/reserva.`
+    : "Nenhuma alternativa é viável com o caixa livre mensal e a reserva informados. Como a pessoa não pode ficar negativa, o cenário exige aumentar caixa/reserva, reduzir desembolsos ou rever prazo/valor antes de recomendar uma estratégia.";
   document.getElementById("proposalConclusion").textContent = conclusion;
 
   const assumptions = [
@@ -895,6 +988,223 @@ function renderProposal(result) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function printMetric(label, value) {
+  return `
+    <div class="print-metric">
+      <span>${escapeHtml(label)}</span>
+      <strong>${value}</strong>
+    </div>
+  `;
+}
+
+function getAlternativeDescription(result, strategy) {
+  const p = result.inputs;
+  const financed = result.derived.financed;
+  const entry = result.derived.entry;
+
+  if (strategy.id === "fin") {
+    return `Financiamento de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)}, sem amortização extraordinária até o final do prazo de ${p.finMonths} meses.`;
+  }
+
+  if (strategy.id === "amort") {
+    return `Financiamento de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)} e amortização mensal usando a disponibilidade de caixa prevista até a quitação.`;
+  }
+
+  if (strategy.id === "iq") {
+    return `Financiamento de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)}, combinado com consórcio de aproximadamente ${formatCurrency(result.schedules.iq.creditUpdated)} para atuar como interveniente quitante a partir do mês ${p.iqMonth}. Carta inicial estimada de ${formatCurrency(result.schedules.iq.letterInitial)}, prazo de ${p.consMonths} meses e reajuste anual de ${formatPercent(p.consAdjustPct)}.`;
+  }
+
+  const bidParts = [];
+  if (p.useEmbeddedBid) bidParts.push(`lance embutido de ${formatPercent(p.embeddedBidPct)}`);
+  if (p.useFreeBid) bidParts.push(`lance livre de ${formatPercent(p.freeBidPct)}`);
+  if (p.useFixedBid) bidParts.push(`lance fixo de ${formatPercent(p.fixedBidPct)}`);
+  const bidText = bidParts.length ? `, com ${bidParts.join(" e ")}` : "";
+  const clientBidText = result.schedules.direct.clientBid > 0.01
+    ? ` Lance adicional de recursos próprios estimado em ${formatCurrency(result.schedules.direct.clientBid)}.`
+    : " Sem lance adicional de recursos próprios no cenário base.";
+
+  return `Consórcio para aquisição de ${formatCurrency(p.propertyValue)}, com carta bruta estimada de ${formatCurrency(result.schedules.direct.grossCredit)}${bidText}, contemplação simulada no mês ${p.directMonth}.${clientBidText}`;
+}
+
+function renderPrintAlternativeCards(result) {
+  return result.strategies
+    .map((strategy, index) => `
+      <article class="print-alt-card" style="--strategy-color: ${strategyColors[strategy.id]}">
+        <div class="print-alt-number">${index + 1}</div>
+        <div class="print-alt-content">
+          <h3>${escapeHtml(strategy.name)}</h3>
+          <p>${escapeHtml(getAlternativeDescription(result, strategy))}</p>
+          <div class="print-alt-metrics">
+            ${printMetric("Aquisição", escapeHtml(formatMonth(strategy.acquisitionMonth)))}
+            ${printMetric("Entrada/lance", escapeHtml(formatCurrency(strategy.entryOrInitial)))}
+            ${printMetric("Custo", escapeHtml(formatCurrency(strategy.totalOutputs)))}
+            ${printMetric("Patrimônio Acumulado", escapeHtml(formatStrategyPatrimony(strategy)))}
+          </div>
+        </div>
+      </article>
+    `)
+    .join("");
+}
+
+function renderPrintBarRows(result, valueKey) {
+  const viable = result.strategies.filter((strategy) => strategy.isViable);
+  const maxValue = Math.max(1, ...viable.map((strategy) => Math.abs(strategy[valueKey])));
+
+  return result.strategies
+    .map((strategy) => {
+      const isViable = strategy.isViable;
+      const width = isViable ? Math.max(2, Math.abs(strategy[valueKey]) / maxValue * 100) : 0;
+      const value = valueKey === "adjustedToday"
+        ? formatStrategyPatrimony(strategy)
+        : isViable ? formatCurrency(strategy[valueKey]) : "Inviável";
+      const color = valueKey === "adjustedToday" ? strategyColors[strategy.id] : "#766300";
+
+      return `
+        <div class="print-chart-row${isViable ? "" : " is-infeasible"}">
+          <span>${escapeHtml(strategy.short)}</span>
+          <div class="print-chart-track">
+            <div class="print-chart-fill" style="width: ${width}%; background: ${color};"></div>
+          </div>
+          <strong>${escapeHtml(value)}</strong>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderPrintAssumptions(result) {
+  const p = result.inputs;
+  const items = [
+    ["Imóvel", formatCurrency(p.propertyValue)],
+    ["Reserva", formatCurrency(p.reserve)],
+    ["Caixa mensal", formatCurrency(p.monthlyCash)],
+    ["Horizonte", `${p.horizonMonths} meses`],
+    ["Finalidade", p.usage === "Moradia propria" ? "Moradia" : "Investimento para aluguel"],
+    ["Rentabilidade", formatPercent(p.annualReturn)],
+    ["Valorização", formatPercent(p.appreciationPct)],
+    ["Inflação", formatPercent(p.inflationPct)],
+  ];
+
+  return items
+    .map(([label, value]) => printMetric(label, escapeHtml(value)))
+    .join("");
+}
+
+function renderPrintRecommendation(result) {
+  if (!result.best) {
+    return `
+      <section class="print-card print-recommendation-card">
+        <h2>Nenhuma alternativa viável no cenário</h2>
+        <p>Com o caixa livre mensal e a reserva informados, nenhuma alternativa se sustenta sem déficit não coberto. Ajuste as premissas antes de emitir uma recomendação.</p>
+      </section>
+    `;
+  }
+
+  const gap = result.second ? result.best.adjustedToday - result.second.adjustedToday : 0;
+  const secondText = result.second
+    ? `${formatCurrency(gap)} acima da segunda alternativa.`
+    : "Única alternativa viável no cenário informado.";
+
+  return `
+    <section class="print-card print-recommendation-card">
+      <h2>${escapeHtml(result.best.name)} aparece como a melhor alternativa neste cenário.</h2>
+      <div class="print-why-grid">
+        <article>
+          <i></i>
+          <h3>1. Maior patrimônio</h3>
+          <p>Patrimônio Acumulado de ${escapeHtml(formatStrategyPatrimony(result.best))}.</p>
+        </article>
+        <article>
+          <i></i>
+          <h3>2. Vantagem clara</h3>
+          <p>${escapeHtml(secondText)}</p>
+        </article>
+        <article>
+          <i></i>
+          <h3>3. Custo estimado</h3>
+          <p>Custo de ${escapeHtml(formatCurrency(result.best.totalOutputs))} no horizonte analisado.</p>
+        </article>
+      </div>
+      <div class="print-conclusion">
+        <h3>Conclusão</h3>
+        <p>A alternativa ${escapeHtml(result.best.name)} se destaca por entregar o maior Patrimônio Acumulado entre as opções viáveis analisadas, mantendo um custo estimado compatível com as premissas de caixa e contemplação adotadas no cenário.</p>
+      </div>
+    </section>
+  `;
+}
+
+function renderPrintReport(result) {
+  const container = document.getElementById("printReport");
+  if (!container) return;
+
+  const bestName = result.best ? result.best.name : "Nenhuma viável";
+  const bestPatrimony = result.best ? formatStrategyPatrimony(result.best) : "Inviável";
+
+  container.innerHTML = `
+    <section class="print-page print-page-light">
+      <header class="print-header">
+        <div class="print-wordmark" aria-label="Grupo Ável"><span>grupo</span><i></i><strong>ável.</strong></div>
+        <b></b>
+      </header>
+      <h1>Alternativas analisadas</h1>
+      <p class="print-lead">Quatro caminhos foram analisados para a aquisição do imóvel. Cada alternativa abaixo considera as mesmas premissas de valor, prazo, caixa disponível e rentabilidade.</p>
+      <div class="print-alt-list">
+        ${renderPrintAlternativeCards(result)}
+      </div>
+      <footer>Ável - Relatório comparativo de aquisição <strong>Página 1</strong></footer>
+    </section>
+
+    <section class="print-page print-page-dark">
+      <header class="print-header">
+        <div class="print-wordmark" aria-label="Grupo Ável"><span>grupo</span><i></i><strong>ável.</strong></div>
+        <b></b>
+      </header>
+      <div class="print-recommendation-hero">
+        <div>
+          <h1>Recomendação<br>do cenário</h1>
+          <p>Com as premissas informadas, a indicação considera Patrimônio Acumulado, custo estimado, momento de aquisição e capacidade de manter o plano.</p>
+        </div>
+        <aside>
+          ${printMetric("Estratégia indicada", escapeHtml(bestName))}
+          ${printMetric("Patrimônio Acumulado", escapeHtml(bestPatrimony))}
+        </aside>
+      </div>
+      ${renderPrintRecommendation(result)}
+      <footer>Ável - Relatório comparativo de aquisição <strong>Página 2</strong></footer>
+    </section>
+
+    <section class="print-page print-page-light">
+      <header class="print-header">
+        <div class="print-wordmark" aria-label="Grupo Ável"><span>grupo</span><i></i><strong>ável.</strong></div>
+        <b></b>
+      </header>
+      <h1>Gráficos e premissas</h1>
+      <section class="print-chart-card">
+        <h2>Patrimônio Acumulado</h2>
+        ${renderPrintBarRows(result, "adjustedToday")}
+      </section>
+      <section class="print-chart-card">
+        <h2>Custo</h2>
+        ${renderPrintBarRows(result, "totalOutputs")}
+      </section>
+      <section class="print-assumptions-card">
+        <h2>Premissas usadas</h2>
+        <div>${renderPrintAssumptions(result)}</div>
+      </section>
+      <footer>Ável - Relatório comparativo de aquisição <strong>Página 3</strong></footer>
+    </section>
+  `;
+}
+
 function render(result) {
   renderHero(result);
   renderStrategyCards(result);
@@ -903,6 +1213,7 @@ function render(result) {
   renderComparisonRows(result);
   renderAssumptions(result);
   renderProposal(result);
+  renderPrintReport(result);
 }
 
 function update() {
@@ -938,6 +1249,20 @@ function init() {
   document.getElementById("resetButton").addEventListener("click", () => {
     setDomState(defaultInputs);
     render(calculateScenario(defaultInputs));
+  });
+
+  const manualButton = document.getElementById("manualButton");
+  const manualDialog = document.getElementById("manualDialog");
+  const manualCloseButton = document.getElementById("manualCloseButton");
+
+  manualButton.addEventListener("click", () => {
+    manualDialog.querySelector(".manual-content").scrollTop = 0;
+    manualDialog.showModal();
+  });
+
+  manualCloseButton.addEventListener("click", () => manualDialog.close());
+  manualDialog.addEventListener("click", (event) => {
+    if (event.target === manualDialog) manualDialog.close();
   });
 
   document.getElementById("printButton").addEventListener("click", () => window.print());

@@ -7,8 +7,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const outputDir = path.join(rootDir, "outputs", "consorcio_financiamento");
-const outputPath = path.join(outputDir, "simulador_consorcio_interveniente_quitante_final_amortizacao_caixa_livre.xlsx");
-const correctionReportPath = path.join(outputDir, "relatorio_correcoes_amortizacao_caixa_livre.md");
+const outputPath = path.join(outputDir, "simulador_consorcio_interveniente_quitante_final_sem_patrimonio_bruto.xlsx");
+const correctionReportPath = path.join(outputDir, "relatorio_correcoes_viabilidade_caixa.md");
 
 const FIN_MONTHS = 480;
 const OPP_MAX_MONTHS = 480;
@@ -198,7 +198,7 @@ const assumptionRows = [
   [42, "Caixa livre mensal antes dos fluxos do imovel", "value", 7000, currencyFmt, "Caixa mensal disponivel antes de entrada, parcelas, aluguel pago, aluguel recebido, consorcio e lances."],
   [43, "Valor em reserva", "value", 90000, currencyFmt, "Reserva inicial disponivel. Deve ser pelo menos a maior entrada exigida entre as estrategias."],
   [44, "Maior entrada entre estrategias", "formula", "=MAX(B8,'Consorcio Direto'!$B$44)", currencyFmt, "Check de reserva minima para comparar estrategias com e sem entrada de forma justa."],
-  [45, "Valor do imovel no horizonte", "formula", "=B6*(1+B66)^(B39/12)", currencyFmt, "Usado no patrimonio liquido. A valorizacao fica zerada por padrao, mas e editavel no bloco de rotulos."],
+  [45, "Valor do imovel no horizonte", "formula", "=B6*(1+B66)^(B39/12)", currencyFmt, "Usado no patrimonio liquido. A valorizacao parte de 6% a.a. por padrao e permanece editavel."],
 ];
 
 for (const [row, label, kind, value, fmt, note] of assumptionRows) {
@@ -270,8 +270,8 @@ const rentalRows = [
   [63, "IR sobre aluguel", "value", 0, pctFmt, "Percentual redutor, se aplicavel."],
   [64, "Aluguel recebido liquido inicial", "formula", "=B56*(1-SUM(B58:B63))", currencyFmt, "Valor liquido usado no motor apenas no modo Investimento para aluguel, apos aquisicao/contemplacao e disponibilidade."],
   [65, "Modelo nominal", "value", "Nominal", "@", "O motor permanece nominal. Valores em R$ de hoje sao apenas conversoes de apresentacao usando a inflacao esperada."],
-  [66, "Valorizacao do imovel a.a.", "value", 0, pctFmt, "Preset conservador de 0% a.a.; altere se quiser valorizar o imovel no horizonte."],
-  [67, "Inflacao anual esperada", "value", 0, pctFmt, "Usada apenas para converter valores nominais futuros em R$ de hoje. Nao altera o motor nominal."],
+  [66, "Valorizacao do imovel a.a.", "value", 0.06, pctFmt, "Preset de 6% a.a.; altere conforme a premissa do cenario."],
+  [67, "Inflacao anual esperada", "value", 0.06, pctFmt, "Preset de 6% a.a.; usada apenas para converter valores nominais futuros em R$ de hoje. Nao altera o motor nominal."],
   [68, "Inflacao mensal equivalente", "formula", "=(1+B67)^(1/12)-1", pctFmt2, "Taxa mensal equivalente composta da inflacao esperada."],
   [69, "Fator inflacao acumulada no horizonte", "formula", "=(1+B67)^(B39/12)", "0.0000x", "Divide valores nominais futuros para apresentar equivalentes em R$ de hoje."],
   [72, "Caixa comum incluido", "formula", "=B43", currencyFmt, "Reserva efetivamente usada no motor mensal de caixa."],
@@ -322,22 +322,21 @@ applyNumberFormat(premissas, "B72:B77", currencyFmt);
 premissas.getRange("B47").dataValidation = { rule: { type: "list", values: ["Moradia propria", "Investimento para aluguel"] } };
 premissas.getRange("B65").dataValidation = { rule: { type: "list", values: ["Nominal"] } };
 
-premissas.getRange("A81:E88").values = [
+premissas.getRange("A81:E87").values = [
   ["Convencao", "Descricao", "", "", ""],
   ["SAC com TR", "TR mensal corrige o saldo no inicio do mes; juros incidem sobre o saldo corrigido; amortizacao ordinaria e calculada pelo saldo corrigido dividido pelos meses restantes.", "", "", ""],
   ["Consorcio", "Credito e parcela reajustam anualmente por degrau. A carta inicial e dimensionada para que o credito atualizado no mes da contemplacao quite o saldo do financiamento.", "", "", ""],
   ["Interveniente quitante", "No mes da contemplacao, o cliente paga a prestacao normal do financiamento e usa a carta para quitar o saldo restante daquele mes.", "", "", ""],
   ["Amortizacao de prazo", "A sobra entre o caixa livre mensal e a prestacao ordinaria SAC do proprio mes e usada como amortizacao extra direta no saldo devedor, reduzindo prazo. Como a prestacao SAC cai ao longo do tempo, a sobra mensal para amortizar tende a crescer.", "", "", ""],
-  ["Motor Caixa", "O caixa livre mensal entra antes dos fluxos do imovel. Sobra vira investimento; deficit consome reserva/saldo investido; se zerar, vira capital adicional.", "", "", ""],
-  ["Patrimonio bruto", "Saldo investido + valor do imovel - saldo devedor. Nao deduz capital adicional em valor futuro.", "", "", ""],
-  ["Patrimonio ajustado", "Patrimonio bruto - capital adicional acumulado em valor futuro. Esta e a metrica usada no ranking economico.", "", "", ""],
+  ["Motor Caixa", "O caixa livre mensal entra antes dos fluxos do imovel. Sobra vira investimento; deficit consome reserva/saldo investido; se a reserva/saldo acabar, o deficit nao coberto torna a estrategia inviavel.", "", "", ""],
+  ["Patrimonio", "Mostra patrimonio apenas quando a estrategia nao tem deficit nao coberto. Estrategias inviaveis nao devem ser ranqueadas como recomendacao.", "", "", ""],
 ];
 premissas.getRange("A81:E81").format = {
   fill: colors.teal,
   font: { bold: true, color: "#FFFFFF" },
   borders: { preset: "all", style: "thin", color: "#FFFFFF" },
 };
-premissas.getRange("A82:E88").format.borders = { preset: "all", style: "thin", color: colors.line };
+premissas.getRange("A82:E87").format.borders = { preset: "all", style: "thin", color: colors.line };
 premissas.getRange("B82:E88").merge(true);
 premissas.getRange("B82:E88").format.wrapText = true;
 
@@ -637,7 +636,7 @@ setWidths(
 motor.freezePanes.freezeRows(5);
 motor.getRange("A3:BS3").values = [[
   "Metodo",
-  "A capacidade mensal e o caixa livre antes dos fluxos do imovel. Entradas e saidas do imovel entram no mes; sobra aumenta o saldo investido; deficit consome o saldo; se o saldo zerar, vira capital adicional. O patrimonio liquido deduz o capital adicional acumulado em valor futuro.",
+  "A capacidade mensal e o caixa livre antes dos fluxos do imovel. Entradas e saidas do imovel entram no mes; sobra aumenta o saldo investido; deficit consome reserva/saldo investido. Se o saldo acabar, o deficit nao coberto torna a estrategia inviavel.",
   ...Array.from({ length: 69 }, () => ""),
 ]];
 motor.getRange("A3").format.font = { bold: true };
@@ -662,13 +661,13 @@ const motorMetricHeaders = [
   "Entradas totais",
   "Fluxo livre",
   "Saldo antes ajuste",
-  "Capital adicional mes",
-  "Capital adicional VF",
+  "Deficit nao coberto mes",
+  "Deficit nao coberto VF",
   "Saldo investido",
   "Saldo devedor",
   "Patrimonio imovel",
   "Patrimonio bruto",
-  "Patrimonio ajustado",
+  "Patrimonio",
   "Status",
 ];
 const motorStrategies = [
@@ -782,8 +781,8 @@ for (const strategy of motorStrategies) {
       strategy.debtFormula(row),
       strategy.propertyFormula(row),
       `=${c[10]}${row}+${c[12]}${row}-${c[11]}${row}`,
-      `=${c[13]}${row}-${c[9]}${row}`,
-      `=IF(${c[9]}${row}>1,"Exige capital","OK")`,
+      `=IF(${c[9]}${row}>1,"Inviavel",${c[13]}${row})`,
+      `=IF(${c[9]}${row}>1,"Inviavel","OK")`,
     ]);
   }
   const startCol = colLetter(start);
@@ -810,13 +809,13 @@ checks.getRange("A5:G30").values = [
   ["Consorcio direto: prazo dentro do limite", null, null, null, null, null, "Cronograma mensal do consorcio direto suporta ate 480 meses."],
   ["Reserva cobre maior entrada/lance", null, null, null, null, null, "Reserva deve cobrir a maior necessidade inicial/lance relevante entre as estrategias."],
   ["Motor: horizonte dentro do limite", null, null, null, null, null, "O motor mensal suporta ate 480 meses."],
-  ["Motor: saldo investido nao fica negativo", null, null, null, null, null, "Saldo investido e truncado em zero; deficit vira capital adicional."],
+  ["Motor: saldo investido nao fica negativo", null, null, null, null, null, "Saldo investido e truncado em zero; deficit nao coberto marca inviabilidade."],
   ["Motor referencia Consorcio Direto", null, null, null, null, null, "A estrategia 4 usa a aba Consorcio Direto para contemplacao, parcela e lance."],
   ["Sem formulas de retorno interno", null, null, null, null, null, "Nenhuma formula de retorno interno deve existir no arquivo decisorio."],
   ["Modelo permanece nominal", null, null, null, null, null, "Nao permitir Real sem logica real implementada."],
-  ["Patrimonio bruto bate formula", null, null, null, null, null, "Patrimonio bruto = saldo investido + imovel - saldo devedor."],
-  ["Patrimonio ajustado bate formula", null, null, null, null, null, "Patrimonio ajustado = patrimonio bruto - capital adicional em valor futuro."],
-  ["Capital adicional separa bruto de ajustado", null, null, null, null, null, "Capital adicional VF deve explicar a diferenca entre patrimonio bruto e ajustado."],
+  ["Patrimonio nominal bate formula", null, null, null, null, null, "Quando a estrategia e executavel, patrimonio nominal = saldo investido + imovel - saldo devedor."],
+  ["Patrimonio bate status", null, null, null, null, null, "Se houver deficit nao coberto, patrimonio deve mostrar Inviavel."],
+  ["Deficit nao coberto marca inviabilidade", null, null, null, null, null, "Deficit nao coberto VF deve explicar o Status Inviavel."],
   ["Aluguel pago somente em moradia", null, null, null, null, null, "Se o uso for investimento, aluguel pago deve ser zero."],
   ["Aluguel recebido somente em investimento", null, null, null, null, null, "Se o uso for moradia, aluguel recebido deve ser zero."],
   ["Consorcio direto sem aluguel recebido antes de contemplacao/chaves", null, null, null, null, null, "Receita de aluguel do consorcio direto so pode aparecer apos o maior entre contemplacao direta e disponibilidade."],
@@ -824,10 +823,10 @@ checks.getRange("A5:G30").values = [
   ["VPL e Gap usam mesma base temporal", null, null, null, null, null, "VPL deve ser o Gap VF descontado pela taxa de oportunidade."],
   ["Inflacao anual esperada nao negativa", null, null, null, null, null, "Inflacao usada apenas para apresentacao em R$ de hoje."],
   ["Fator inflacao acumulada >= 1", null, null, null, null, null, "Com inflacao esperada nao negativa, o fator deve ser no minimo 1."],
-  ["Patrimonio ajustado R$ hoje bate formula", null, null, null, null, null, "Patrimonio ajustado em R$ de hoje = patrimonio ajustado nominal / fator de inflacao."],
+  ["Patrimonio R$ hoje bate formula", null, null, null, null, null, "Patrimonio em R$ de hoje = patrimonio nominal / fator de inflacao, apenas se executavel."],
   ["Motor nominal nao referencia inflacao", null, null, null, null, null, "Validado no build: Motor Caixa nao usa as celulas de inflacao."],
   ["VPL nominal nao referencia inflacao", null, null, null, null, null, "Validado no build: VPL vs base nao usa inflacao."],
-  ["Calculos centrais sem inflacao", null, null, null, null, null, "Validado no build: financiamento, consorcio, aluguel, capital adicional e motor nao usam inflacao."],
+  ["Calculos centrais sem inflacao", null, null, null, null, null, "Validado no build: financiamento, consorcio, aluguel, deficit nao coberto e motor nao usam inflacao."],
   ["Varredura de erros de formula no build", null, null, null, null, null, "O script executa busca por erros Excel antes de salvar o arquivo."],
   ["Status geral", null, null, null, null, null, "Consolida os checks acima."],
 ];
@@ -842,17 +841,17 @@ checks.getRange("B5:F29").formulas = [
   ["=Resumo!$C$13", "='Consorcio Direto'!$B$29", "=B12-C12", "=0", '=IF(B12=C12,"OK","Revisar")'],
   ['="Removido"', '="Removido"', '=IF(B13=C13,0,1)', "=0", '=IF(B13=C13,"OK","Revisar")'],
   ["=Premissas!$B$65", '="Nominal"', '=IF(B14=C14,0,1)', "=0", '=IF(B14=C14,"OK","Revisar")'],
-  ["=MAX(ABS(Resumo!$I$10-(INDEX('Motor Caixa'!$R$5:$R$484,Premissas!$B$39)+INDEX('Motor Caixa'!$T$5:$T$484,Premissas!$B$39)-INDEX('Motor Caixa'!$S$5:$S$484,Premissas!$B$39))),ABS(Resumo!$I$11-(INDEX('Motor Caixa'!$AH$5:$AH$484,Premissas!$B$39)+INDEX('Motor Caixa'!$AJ$5:$AJ$484,Premissas!$B$39)-INDEX('Motor Caixa'!$AI$5:$AI$484,Premissas!$B$39))),ABS(Resumo!$I$12-(INDEX('Motor Caixa'!$AX$5:$AX$484,Premissas!$B$39)+INDEX('Motor Caixa'!$AZ$5:$AZ$484,Premissas!$B$39)-INDEX('Motor Caixa'!$AY$5:$AY$484,Premissas!$B$39))),ABS(Resumo!$I$13-(INDEX('Motor Caixa'!$BN$5:$BN$484,Premissas!$B$39)+INDEX('Motor Caixa'!$BP$5:$BP$484,Premissas!$B$39)-INDEX('Motor Caixa'!$BO$5:$BO$484,Premissas!$B$39))))", "=0", "=B15-C15", "=1", '=IF(ABS(D15)<=E15,"OK","Revisar")'],
-  ["=MAX(ABS(Resumo!$K$10-(Resumo!$I$10-Resumo!$H$10)),ABS(Resumo!$K$11-(Resumo!$I$11-Resumo!$H$11)),ABS(Resumo!$K$12-(Resumo!$I$12-Resumo!$H$12)),ABS(Resumo!$K$13-(Resumo!$I$13-Resumo!$H$13)))", "=0", "=B16-C16", "=1", '=IF(ABS(D16)<=E16,"OK","Revisar")'],
-  ["=MAX(ABS((Resumo!$I$10-Resumo!$K$10)-Resumo!$H$10),ABS((Resumo!$I$11-Resumo!$K$11)-Resumo!$H$11),ABS((Resumo!$I$12-Resumo!$K$12)-Resumo!$H$12),ABS((Resumo!$I$13-Resumo!$K$13)-Resumo!$H$13))", "=0", "=B17-C17", "=1", '=IF(ABS(D17)<=E17,"OK","Revisar")'],
+  ['=MAX(IF(ISNUMBER(Resumo!$I$10),ABS(Resumo!$I$10-(INDEX(\'Motor Caixa\'!$R$5:$R$484,Premissas!$B$39)+INDEX(\'Motor Caixa\'!$T$5:$T$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$S$5:$S$484,Premissas!$B$39))),0),IF(ISNUMBER(Resumo!$I$11),ABS(Resumo!$I$11-(INDEX(\'Motor Caixa\'!$AH$5:$AH$484,Premissas!$B$39)+INDEX(\'Motor Caixa\'!$AJ$5:$AJ$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$AI$5:$AI$484,Premissas!$B$39))),0),IF(ISNUMBER(Resumo!$I$12),ABS(Resumo!$I$12-(INDEX(\'Motor Caixa\'!$AX$5:$AX$484,Premissas!$B$39)+INDEX(\'Motor Caixa\'!$AZ$5:$AZ$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$AY$5:$AY$484,Premissas!$B$39))),0),IF(ISNUMBER(Resumo!$I$13),ABS(Resumo!$I$13-(INDEX(\'Motor Caixa\'!$BN$5:$BN$484,Premissas!$B$39)+INDEX(\'Motor Caixa\'!$BP$5:$BP$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$BO$5:$BO$484,Premissas!$B$39))),0))', "=0", "=B15-C15", "=1", '=IF(ABS(D15)<=E15,"OK","Revisar")'],
+  ['=IF(AND(IF(Resumo!$H$10>1,AND(Resumo!$I$10="Inviavel",Resumo!$J$10="Inviavel"),AND(ISNUMBER(Resumo!$I$10),ISNUMBER(Resumo!$J$10))),IF(Resumo!$H$11>1,AND(Resumo!$I$11="Inviavel",Resumo!$J$11="Inviavel"),AND(ISNUMBER(Resumo!$I$11),ISNUMBER(Resumo!$J$11))),IF(Resumo!$H$12>1,AND(Resumo!$I$12="Inviavel",Resumo!$J$12="Inviavel"),AND(ISNUMBER(Resumo!$I$12),ISNUMBER(Resumo!$J$12))),IF(Resumo!$H$13>1,AND(Resumo!$I$13="Inviavel",Resumo!$J$13="Inviavel"),AND(ISNUMBER(Resumo!$I$13),ISNUMBER(Resumo!$J$13)))),0,1)', "=0", "=B16-C16", "=0", '=IF(B16=C16,"OK","Revisar")'],
+  ['=MAX(ABS(IF(Resumo!$O$10="Inviavel",1,0)-IF(Resumo!$H$10>1,1,0)),ABS(IF(Resumo!$O$11="Inviavel",1,0)-IF(Resumo!$H$11>1,1,0)),ABS(IF(Resumo!$O$12="Inviavel",1,0)-IF(Resumo!$H$12>1,1,0)),ABS(IF(Resumo!$O$13="Inviavel",1,0)-IF(Resumo!$H$13>1,1,0)))', "=0", "=B17-C17", "=0", '=IF(B17=C17,"OK","Revisar")'],
   ['=IF(Premissas!$B$47="Investimento para aluguel",SUM(\'Motor Caixa\'!$J$5:$J$484,\'Motor Caixa\'!$Z$5:$Z$484,\'Motor Caixa\'!$AP$5:$AP$484,\'Motor Caixa\'!$BF$5:$BF$484),0)', "=0", "=B18-C18", "=1", '=IF(ABS(D18)<=E18,"OK","Revisar")'],
   ['=IF(Premissas!$B$47="Moradia propria",SUM(\'Motor Caixa\'!$K$5:$K$484,\'Motor Caixa\'!$AA$5:$AA$484,\'Motor Caixa\'!$AQ$5:$AQ$484,\'Motor Caixa\'!$BG$5:$BG$484),0)', "=0", "=B19-C19", "=1", '=IF(ABS(D19)<=E19,"OK","Revisar")'],
   ['=SUMIFS(\'Motor Caixa\'!$BG$5:$BG$484,\'Motor Caixa\'!$A$5:$A$484,"<"&MAX(\'Consorcio Direto\'!$B$29,Premissas!$B$49))', "=0", "=B20-C20", "=1", '=IF(ABS(D20)<=E20,"OK","Revisar")'],
   ['=IF(Premissas!$B$47="Investimento para aluguel",MAX(ABS(INDEX(\'Motor Caixa\'!$K$5:$K$484,Premissas!$B$51)-INDEX(\'Motor Caixa\'!$E$5:$E$484,Premissas!$B$51)),ABS(INDEX(\'Motor Caixa\'!$AA$5:$AA$484,Premissas!$B$51)-INDEX(\'Motor Caixa\'!$E$5:$E$484,Premissas!$B$51)),ABS(INDEX(\'Motor Caixa\'!$AQ$5:$AQ$484,Premissas!$B$51)-INDEX(\'Motor Caixa\'!$E$5:$E$484,Premissas!$B$51))),0)', "=0", "=B21-C21", "=1", '=IF(ABS(D21)<=E21,"OK","Revisar")'],
-  ["=MAX(ABS(Resumo!$M$10*(1+Premissas!$B$41)^Premissas!$B$39-Resumo!$N$10),ABS(Resumo!$M$11*(1+Premissas!$B$41)^Premissas!$B$39-Resumo!$N$11),ABS(Resumo!$M$12*(1+Premissas!$B$41)^Premissas!$B$39-Resumo!$N$12),ABS(Resumo!$M$13*(1+Premissas!$B$41)^Premissas!$B$39-Resumo!$N$13))", "=0", "=B22-C22", "=1", '=IF(ABS(D22)<=E22,"OK","Revisar")'],
+  ['=MAX(IF(ISNUMBER(Resumo!$K$10),ABS(Resumo!$K$10*(1+Premissas!$B$41)^Premissas!$B$39-Resumo!$L$10),0),IF(ISNUMBER(Resumo!$K$11),ABS(Resumo!$K$11*(1+Premissas!$B$41)^Premissas!$B$39-Resumo!$L$11),0),IF(ISNUMBER(Resumo!$K$12),ABS(Resumo!$K$12*(1+Premissas!$B$41)^Premissas!$B$39-Resumo!$L$12),0),IF(ISNUMBER(Resumo!$K$13),ABS(Resumo!$K$13*(1+Premissas!$B$41)^Premissas!$B$39-Resumo!$L$13),0))', "=0", "=B22-C22", "=1", '=IF(ABS(D22)<=E22,"OK","Revisar")'],
   ["=Premissas!$B$67", "=0", "=B23-C23", "=0", '=IF(B23>=C23,"OK","Revisar")'],
   ["=Premissas!$B$69", "=1", "=B24-C24", "=0", '=IF(B24>=C24,"OK","Revisar")'],
-  ["=MAX(ABS(Resumo!$L$10-Resumo!$K$10/Premissas!$B$69),ABS(Resumo!$L$11-Resumo!$K$11/Premissas!$B$69),ABS(Resumo!$L$12-Resumo!$K$12/Premissas!$B$69),ABS(Resumo!$L$13-Resumo!$K$13/Premissas!$B$69))", "=0", "=B25-C25", "=1", '=IF(ABS(D25)<=E25,"OK","Revisar")'],
+  ['=MAX(IF(ISNUMBER(Resumo!$J$10),ABS(Resumo!$J$10-Resumo!$I$10/Premissas!$B$69),0),IF(ISNUMBER(Resumo!$J$11),ABS(Resumo!$J$11-Resumo!$I$11/Premissas!$B$69),0),IF(ISNUMBER(Resumo!$J$12),ABS(Resumo!$J$12-Resumo!$I$12/Premissas!$B$69),0),IF(ISNUMBER(Resumo!$J$13),ABS(Resumo!$J$13-Resumo!$I$13/Premissas!$B$69),0))', "=0", "=B25-C25", "=1", '=IF(ABS(D25)<=E25,"OK","Revisar")'],
   ['="Verificado no build"', '="Verificado no build"', '=IF(B26=C26,0,1)', "=0", '=IF(B26=C26,"OK","Revisar")'],
   ['="Verificado no build"', '="Verificado no build"', '=IF(B27=C27,0,1)', "=0", '=IF(B27=C27,"OK","Revisar")'],
   ['="Verificado no build"', '="Verificado no build"', '=IF(B28=C28,0,1)', "=0", '=IF(B28=C28,"OK","Revisar")'],
@@ -942,18 +941,18 @@ const sourceRows = [
   ["Credito liquido consorcio direto", "='Consorcio Direto'!$B$43", "R$", "Consorcio Direto", "Credito recebido apos lance embutido."],
   ["Lance com recursos do cliente consorcio direto", "='Consorcio Direto'!$B$44", "R$", "Consorcio Direto", "Descapitalizacao efetiva do cliente quando ha lances combinados."],
   ["Parcela inicial consorcio direto", "='Consorcio Direto'!$B$45", "R$/mes", "Consorcio Direto", "Primeira parcela antes dos reajustes anuais."],
-  ["Valor do imovel no horizonte", "=Premissas!$B$45", "R$", "Calculo do modelo", "Considera a valorizacao editavel, zerada por padrao."],
+  ["Valor do imovel no horizonte", "=Premissas!$B$45", "R$", "Calculo do modelo", "Considera a valorizacao editavel, com preset de 6% a.a."],
   ["Uso do imovel", "=Premissas!$B$47", "texto", "Premissa editavel", "Moradia propria ou investimento para aluguel."],
   ["Mes aquisicao financiamento", "=Premissas!$B$48", "mes", "Premissa editavel", "Financiamento e IQ compram no inicio por padrao."],
   ["Mes disponibilidade/chaves", "=Premissas!$B$49", "mes", "Premissa editavel", "Controla quando moradia ou aluguel podem ocorrer."],
   ["Aluguel pago inicial", "=Premissas!$B$54", "R$/mes", "Calculo do modelo", "Moradia propria: custo de espera ate a estrategia permitir morar no imovel."],
   ["Aluguel recebido liquido inicial", "=Premissas!$B$64", "R$/mes", "Calculo do modelo", "Investimento para aluguel: receita apenas apos a estrategia ter o imovel e ele estar disponivel."],
   ["Modelo nominal", "=Premissas!$B$65", "texto", "Premissa editavel", "A validacao permite apenas Nominal enquanto nao houver logica real."],
-  ["Valorizacao do imovel", "=Premissas!$B$66", "% a.a.", "Premissa editavel", "Zerada por padrao para manter postura conservadora."],
+  ["Valorizacao do imovel", "=Premissas!$B$66", "% a.a.", "Premissa editavel", "Preset de 6% a.a.; deve ser revisado conforme o cenario."],
   ["Inflacao anual esperada", "=Premissas!$B$67", "% a.a.", "Premissa editavel", "Usada apenas para converter valores nominais futuros em R$ de hoje."],
   ["Inflacao mensal equivalente", "=Premissas!$B$68", "% a.m.", "Calculo do modelo", "Equivalente mensal composto da inflacao esperada."],
   ["Fator inflacao acumulada no horizonte", "=Premissas!$B$69", "x", "Calculo do modelo", "Fator usado apenas nas colunas de apresentacao do Resumo."],
-  ["Observacao sobre inflacao", '=Premissas!$D$67', "texto", "Convencao do modelo", "A inflacao nao altera o Motor Caixa nem as logicas de financiamento, consorcio, aluguel, capital adicional, VPL ou Gap."],
+  ["Observacao sobre inflacao", '=Premissas!$D$67', "texto", "Convencao do modelo", "A inflacao nao altera o Motor Caixa nem as logicas de financiamento, consorcio, aluguel, deficit nao coberto, VPL ou Gap."],
   ["FV base sem compra", "=INDEX('Motor Caixa'!$G$5:$G$484,Premissas!$B$39)", "R$", "Motor Caixa", "Reserva e capacidade mensal investidas a taxa de oportunidade."],
 ];
 const sourceEndRow = 4 + sourceRows.length;
@@ -972,7 +971,7 @@ sourceRows.forEach((row, index) => {
 fontes.getRange(`D5:E${sourceEndRow}`).format.wrapText = true;
 
 // Resumo
-setTitle(resumo, "A1:R1", "Resumo executivo - comparativo de estrategias");
+setTitle(resumo, "A1:P1", "Resumo executivo - comparativo de estrategias");
 setWidths(resumo, [250, 132, 95, 95, 138, 138, 138, 138, 148, 148, 148, 148, 138, 138, 132, 132, 118, 265, 24, 150, 150, 150, 150, 150, 150, 150], 90);
 
 resumo.getRange("A3:N6").values = [
@@ -1026,8 +1025,8 @@ applyNumberFormat(resumo, "N4", currencyFmt);
 applyNumberFormat(resumo, "N5", pctFmt);
 applyNumberFormat(resumo, "N6", monthFmt);
 
-section(resumo, "A8:R8", "Comparativo principal");
-resumo.getRange("A9:R9").values = [[
+section(resumo, "A8:P8", "Comparativo principal");
+resumo.getRange("A9:P9").values = [[
   "Estrategia",
   "Entrada/lance inicial",
   "Mes aquis./cont.",
@@ -1035,11 +1034,9 @@ resumo.getRange("A9:R9").values = [[
   "Saidas nominais totais",
   "Entradas nominais totais",
   "Fluxo liquido nominal acum.",
-  "Capital adicional VF",
-  "Patrimonio bruto nominal",
-  "Patrimonio bruto em R$ de hoje",
-  "Patrimonio ajustado nominal",
-  "Patrimonio ajustado em R$ de hoje",
+  "Deficit nao coberto VF",
+  "Patrimonio nominal",
+  "Patrimonio em R$ de hoje",
   "VPL vs base",
   "Gap VF vs base",
   "Saldo investido",
@@ -1047,14 +1044,14 @@ resumo.getRange("A9:R9").values = [[
   "Status",
   "Observacao",
 ]];
-header(resumo, "A9:R9");
+header(resumo, "A9:P9");
 resumo.getRange("A10:A13").values = [
   ["1. Financiamento sem amortizacao"],
   ["2. Financiamento com amortizacao"],
   ["3. Financiamento + consorcio IQ"],
   ["4. Consorcio"],
 ];
-resumo.getRange("B10:R13").formulas = [
+resumo.getRange("B10:P13").formulas = [
   [
     "=Premissas!$B$8",
     "=Premissas!$B$48",
@@ -1063,15 +1060,13 @@ resumo.getRange("B10:R13").formulas = [
     "=SUMIFS('Motor Caixa'!$M$5:$M$484,'Motor Caixa'!$A$5:$A$484,\"<=\"&Premissas!$B$39)",
     "=F10-E10",
     "=INDEX('Motor Caixa'!$Q$5:$Q$484,Premissas!$B$39)",
-    "=INDEX('Motor Caixa'!$U$5:$U$484,Premissas!$B$39)",
-    "=I10/Premissas!$B$69",
-    "=INDEX('Motor Caixa'!$V$5:$V$484,Premissas!$B$39)",
-    "=K10/Premissas!$B$69",
-    "=(K10-INDEX('Motor Caixa'!$G$5:$G$484,Premissas!$B$39))/(1+Premissas!$B$41)^Premissas!$B$39",
-    "=K10-INDEX('Motor Caixa'!$G$5:$G$484,Premissas!$B$39)",
+    '=IF(H10>1,"Inviavel",INDEX(\'Motor Caixa\'!$U$5:$U$484,Premissas!$B$39))',
+    '=IF(H10>1,"Inviavel",INDEX(\'Motor Caixa\'!$U$5:$U$484,Premissas!$B$39)/Premissas!$B$69)',
+    '=IF(H10>1,"Inviavel",(INDEX(\'Motor Caixa\'!$U$5:$U$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$G$5:$G$484,Premissas!$B$39))/(1+Premissas!$B$41)^Premissas!$B$39)',
+    '=IF(H10>1,"Inviavel",INDEX(\'Motor Caixa\'!$U$5:$U$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$G$5:$G$484,Premissas!$B$39))',
     "=INDEX('Motor Caixa'!$R$5:$R$484,Premissas!$B$39)",
     "=INDEX('Motor Caixa'!$S$5:$S$484,Premissas!$B$39)",
-    '=IF(H10>1,"Exige capital","OK")',
+    '=IF(H10>1,"Inviavel","OK")',
     '"Compra por financiamento; aluguel depende do uso e das chaves."',
   ],
   [
@@ -1082,15 +1077,13 @@ resumo.getRange("B10:R13").formulas = [
     "=SUMIFS('Motor Caixa'!$AC$5:$AC$484,'Motor Caixa'!$A$5:$A$484,\"<=\"&Premissas!$B$39)",
     "=F11-E11",
     "=INDEX('Motor Caixa'!$AG$5:$AG$484,Premissas!$B$39)",
-    "=INDEX('Motor Caixa'!$AK$5:$AK$484,Premissas!$B$39)",
-    "=I11/Premissas!$B$69",
-    "=INDEX('Motor Caixa'!$AL$5:$AL$484,Premissas!$B$39)",
-    "=K11/Premissas!$B$69",
-    "=(K11-INDEX('Motor Caixa'!$G$5:$G$484,Premissas!$B$39))/(1+Premissas!$B$41)^Premissas!$B$39",
-    "=K11-INDEX('Motor Caixa'!$G$5:$G$484,Premissas!$B$39)",
+    '=IF(H11>1,"Inviavel",INDEX(\'Motor Caixa\'!$AK$5:$AK$484,Premissas!$B$39))',
+    '=IF(H11>1,"Inviavel",INDEX(\'Motor Caixa\'!$AK$5:$AK$484,Premissas!$B$39)/Premissas!$B$69)',
+    '=IF(H11>1,"Inviavel",(INDEX(\'Motor Caixa\'!$AK$5:$AK$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$G$5:$G$484,Premissas!$B$39))/(1+Premissas!$B$41)^Premissas!$B$39)',
+    '=IF(H11>1,"Inviavel",INDEX(\'Motor Caixa\'!$AK$5:$AK$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$G$5:$G$484,Premissas!$B$39))',
     "=INDEX('Motor Caixa'!$AH$5:$AH$484,Premissas!$B$39)",
     "=INDEX('Motor Caixa'!$AI$5:$AI$484,Premissas!$B$39)",
-    '=IF(H11>1,"Exige capital","OK")',
+    '=IF(H11>1,"Inviavel","OK")',
     '"Pagamento extra usa a sobra entre caixa livre mensal e prestacao SAC do mes."',
   ],
   [
@@ -1101,15 +1094,13 @@ resumo.getRange("B10:R13").formulas = [
     "=SUMIFS('Motor Caixa'!$AS$5:$AS$484,'Motor Caixa'!$A$5:$A$484,\"<=\"&Premissas!$B$39)",
     "=F12-E12",
     "=INDEX('Motor Caixa'!$AW$5:$AW$484,Premissas!$B$39)",
-    "=INDEX('Motor Caixa'!$BA$5:$BA$484,Premissas!$B$39)",
-    "=I12/Premissas!$B$69",
-    "=INDEX('Motor Caixa'!$BB$5:$BB$484,Premissas!$B$39)",
-    "=K12/Premissas!$B$69",
-    "=(K12-INDEX('Motor Caixa'!$G$5:$G$484,Premissas!$B$39))/(1+Premissas!$B$41)^Premissas!$B$39",
-    "=K12-INDEX('Motor Caixa'!$G$5:$G$484,Premissas!$B$39)",
+    '=IF(H12>1,"Inviavel",INDEX(\'Motor Caixa\'!$BA$5:$BA$484,Premissas!$B$39))',
+    '=IF(H12>1,"Inviavel",INDEX(\'Motor Caixa\'!$BA$5:$BA$484,Premissas!$B$39)/Premissas!$B$69)',
+    '=IF(H12>1,"Inviavel",(INDEX(\'Motor Caixa\'!$BA$5:$BA$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$G$5:$G$484,Premissas!$B$39))/(1+Premissas!$B$41)^Premissas!$B$39)',
+    '=IF(H12>1,"Inviavel",INDEX(\'Motor Caixa\'!$BA$5:$BA$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$G$5:$G$484,Premissas!$B$39))',
     "=INDEX('Motor Caixa'!$AX$5:$AX$484,Premissas!$B$39)",
     "=INDEX('Motor Caixa'!$AY$5:$AY$484,Premissas!$B$39)",
-    '=IF(H12>1,"Exige capital","OK")',
+    '=IF(H12>1,"Inviavel","OK")',
     '"Financiamento compra no inicio; carta quita no mes de contemplacao."',
   ],
   [
@@ -1120,40 +1111,37 @@ resumo.getRange("B10:R13").formulas = [
     "=SUMIFS('Motor Caixa'!$BI$5:$BI$484,'Motor Caixa'!$A$5:$A$484,\"<=\"&Premissas!$B$39)",
     "=F13-E13",
     "=INDEX('Motor Caixa'!$BM$5:$BM$484,Premissas!$B$39)",
-    "=INDEX('Motor Caixa'!$BQ$5:$BQ$484,Premissas!$B$39)",
-    "=I13/Premissas!$B$69",
-    "=INDEX('Motor Caixa'!$BR$5:$BR$484,Premissas!$B$39)",
-    "=K13/Premissas!$B$69",
-    "=(K13-INDEX('Motor Caixa'!$G$5:$G$484,Premissas!$B$39))/(1+Premissas!$B$41)^Premissas!$B$39",
-    "=K13-INDEX('Motor Caixa'!$G$5:$G$484,Premissas!$B$39)",
+    '=IF(H13>1,"Inviavel",INDEX(\'Motor Caixa\'!$BQ$5:$BQ$484,Premissas!$B$39))',
+    '=IF(H13>1,"Inviavel",INDEX(\'Motor Caixa\'!$BQ$5:$BQ$484,Premissas!$B$39)/Premissas!$B$69)',
+    '=IF(H13>1,"Inviavel",(INDEX(\'Motor Caixa\'!$BQ$5:$BQ$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$G$5:$G$484,Premissas!$B$39))/(1+Premissas!$B$41)^Premissas!$B$39)',
+    '=IF(H13>1,"Inviavel",INDEX(\'Motor Caixa\'!$BQ$5:$BQ$484,Premissas!$B$39)-INDEX(\'Motor Caixa\'!$G$5:$G$484,Premissas!$B$39))',
     "=INDEX('Motor Caixa'!$BN$5:$BN$484,Premissas!$B$39)",
     "=INDEX('Motor Caixa'!$BO$5:$BO$484,Premissas!$B$39)",
-    '=IF(H13>1,"Exige capital","OK")',
+    '=IF(H13>1,"Inviavel","OK")',
     '"Sem entrada inicial; compra e uso/aluguel so apos contemplacao e chaves."',
   ],
 ];
-frame(resumo, "A10:R13");
+frame(resumo, "A10:P13");
 applyNumberFormat(resumo, "B10:B13", currencyFmt);
 applyNumberFormat(resumo, "C10:D13", monthFmt);
-applyNumberFormat(resumo, "E10:P13", currencyFmt);
-resumo.getRange("K10:L13").format.fill = colors.paleGreen;
-resumo.getRange("J10:J13").format.fill = colors.paleBlue;
-resumo.getRange("M10:N13").format.fill = colors.paleBlue;
-resumo.getRange("Q10:R13").format.wrapText = true;
+applyNumberFormat(resumo, "E10:N13", currencyFmt);
+resumo.getRange("I10:J13").format.fill = colors.paleGreen;
+resumo.getRange("K10:L13").format.fill = colors.paleBlue;
+resumo.getRange("O10:P13").format.wrapText = true;
 
 section(resumo, "A16:C16", "Grafico patrimonio corrigido", colors.teal);
 resumo.getRange("A17:C21").values = [
-  ["Estrategia", "Ajustado corrigido", "Dif. vs melhor"],
+  ["Estrategia", "Patrimonio corrigido", "Dif. vs melhor"],
   ["Fin. sem amort.", null],
   ["Fin. amort.", null],
   ["Fin. + IQ", null],
   ["Consorcio", null],
 ];
 resumo.getRange("B18:C21").formulas = [
-  ["=L10", "=B18-MAX($B$18:$B$21)"],
-  ["=L11", "=B19-MAX($B$18:$B$21)"],
-  ["=L12", "=B20-MAX($B$18:$B$21)"],
-  ["=L13", "=B21-MAX($B$18:$B$21)"],
+  ['=IF($O$10="Inviavel","",$J$10)', '=IF(B18="","",B18-MAX($B$18:$B$21))'],
+  ['=IF($O$11="Inviavel","",$J$11)', '=IF(B19="","",B19-MAX($B$18:$B$21))'],
+  ['=IF($O$12="Inviavel","",$J$12)', '=IF(B20="","",B20-MAX($B$18:$B$21))'],
+  ['=IF($O$13="Inviavel","",$J$13)', '=IF(B21="","",B21-MAX($B$18:$B$21))'],
 ];
 header(resumo, "A17:C17", colors.teal);
 frame(resumo, "A18:C21");
@@ -1162,40 +1150,38 @@ resumo.getRange("C18:C21").format.fill = colors.paleBlue;
 applyNumberFormat(resumo, "B18:C21", currencyFmt);
 
 const correctedChart = resumo.charts.add("bar", resumo.getRange("A17:B21"));
-correctedChart.title = "Patrimonio ajustado em R$ de hoje por estrategia";
+correctedChart.title = "Patrimonio em R$ de hoje por estrategia";
 correctedChart.hasLegend = false;
 correctedChart.xAxis = { axisType: "textAxis", textStyle: { fontSize: 9 } };
 correctedChart.yAxis = { numberFormatCode: 'R$ #,##0' };
 correctedChart.series.items[0].fill = colors.teal;
 correctedChart.setPosition("T3", "Z24");
 
-resumo.getRange("A24:R39").values = [
-  ["Definicoes", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Saidas nominais totais", "Soma bruta das saidas do motor: entrada, parcelas, seguros, consorcio, lances e aluguel pago quando aplicavel.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Entradas nominais totais", "Soma bruta das entradas do motor, principalmente aluguel recebido liquido no modo investimento.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Fluxo liquido nominal acum.", "Entradas nominais totais menos saidas nominais totais. Nao substitui VPL nem Gap.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Patrimonio bruto nominal", "Saldo investido + valor do imovel - saldo devedor, no horizonte, em base nominal.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Patrimonio bruto em R$ de hoje", "Patrimonio bruto nominal dividido pelo fator de inflacao acumulada no horizonte.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Patrimonio ajustado nominal", "Patrimonio bruto nominal - capital adicional em valor futuro, sem deflacionar o motor.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Patrimonio ajustado em R$ de hoje", "Patrimonio ajustado nominal dividido pela inflacao acumulada no horizonte. E somente uma conversao de apresentacao.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Inflacao esperada", "Premissa editavel usada apenas para converter valores nominais futuros em R$ de hoje. Nao altera financiamento, consorcio, aluguel, capital adicional ou motor.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Modelo nominal", "Financiamento, consorcio, aluguel, valorizacao e taxa de oportunidade permanecem em base nominal.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Gap VF vs base", "Patrimonio ajustado nominal menos o valor futuro da alternativa base de investir reserva e caixa livre mensal. Positivo e melhor.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["VPL vs base", "VPL vs base ja e uma medida trazida para a data zero pela taxa de oportunidade nominal. A coluna em R$ de hoje apenas deflaciona patrimonio futuro nominal pelo fator de inflacao esperado.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Metricas principais", "Usar VPL vs base, Gap VF vs base, Patrimonio ajustado nominal, Patrimonio ajustado em R$ de hoje, Capital adicional VF e Status de capacidade.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Uso do imovel", "Escolher conforme a finalidade real da decisao da mesma pessoa. Moradia propria usa aluguel pago como custo de espera ate poder morar; investimento para aluguel usa aluguel recebido apenas apos aquisicao/contemplacao e disponibilidade.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Comparabilidade do aluguel", "Estrategias 1, 2 e 3 usam acesso pelo maior entre aquisicao via financiamento e disponibilidade. Estrategia 4 usa acesso pelo maior entre contemplacao do consorcio direto e disponibilidade.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-  ["Consorcio Direto", "Aba auxiliar limpa para parametros, lances, credito liquido e cronograma mensal da estrategia 4. Comparacao principal fica no Resumo.", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+resumo.getRange("A24:P37").values = [
+  ["Definicoes", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Saidas nominais totais", "Soma bruta das saidas do motor: entrada, parcelas, seguros, consorcio, lances e aluguel pago quando aplicavel.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Entradas nominais totais", "Soma bruta das entradas do motor, principalmente aluguel recebido liquido no modo investimento.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Fluxo liquido nominal acum.", "Entradas nominais totais menos saidas nominais totais. Nao substitui VPL nem Gap.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Patrimonio nominal", "Mostra o patrimonio no horizonte apenas quando a estrategia nao tem deficit nao coberto. Se houver deficit, mostra Inviavel.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Patrimonio em R$ de hoje", "Patrimonio nominal convertido para R$ de hoje pelo fator de inflacao acumulada. Se a estrategia for inviavel, tambem mostra Inviavel.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Inflacao esperada", "Premissa editavel usada apenas para converter valores nominais futuros em R$ de hoje. Nao altera financiamento, consorcio, aluguel, deficit nao coberto ou motor.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Modelo nominal", "Financiamento, consorcio, aluguel, valorizacao e taxa de oportunidade permanecem em base nominal.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Gap VF vs base", "Para estrategias executaveis, patrimonio nominal menos o valor futuro da alternativa base de investir reserva e caixa livre mensal. Estrategias inviaveis mostram Inviavel.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["VPL vs base", "Para estrategias executaveis, Gap VF descontado pela taxa de oportunidade nominal. Estrategias inviaveis mostram Inviavel.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Metricas principais", "Usar Status de caixa primeiro. Se Status = Inviavel, patrimonio, VPL e Gap nao devem ser usados como recomendacao.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Uso do imovel", "Escolher conforme a finalidade real da decisao da mesma pessoa. Moradia propria usa aluguel pago como custo de espera ate poder morar; investimento para aluguel usa aluguel recebido apenas apos aquisicao/contemplacao e disponibilidade.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Comparabilidade do aluguel", "Estrategias 1, 2 e 3 usam acesso pelo maior entre aquisicao via financiamento e disponibilidade. Estrategia 4 usa acesso pelo maior entre contemplacao do consorcio direto e disponibilidade.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+  ["Consorcio Direto", "Aba auxiliar limpa para parametros, lances, credito liquido e cronograma mensal da estrategia 4. Comparacao principal fica no Resumo.", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
 ];
-resumo.getRange("A24:R24").merge();
-resumo.getRange("A24:R24").format = {
+resumo.getRange("A24:P24").merge();
+resumo.getRange("A24:P24").format = {
   fill: colors.navy,
   font: { bold: true, color: "#FFFFFF" },
   borders: { preset: "outside", style: "thin", color: colors.navy },
 };
-resumo.getRange("B25:R38").merge(true);
-frame(resumo, "A25:R38", colors.paleGray);
-resumo.getRange("B25:R38").format.wrapText = true;
+resumo.getRange("B25:P37").merge(true);
+frame(resumo, "A25:P37", colors.paleGray);
+resumo.getRange("B25:P37").format.wrapText = true;
 
 // Final formatting touches
 for (const sheet of sheets) {
@@ -1211,9 +1197,9 @@ setTitle(consorcio, "A1:M1", "Cronograma - consorcio como interveniente quitante
 setTitle(amortizacao, "A1:Q1", "Cronograma - amortizacao de prazo com caixa livre");
 setTitle(checks, "A1:G1", "Checks do modelo");
 setTitle(fontes, "A1:E1", "Fontes e trilha de auditoria");
-setTitle(motor, "A1:BS1", "Motor mensal de caixa e patrimonio liquido ajustado");
+setTitle(motor, "A1:BS1", "Motor mensal de caixa e patrimonio");
 setTitle(consorcioDireto, "A1:J1", "Consorcio Direto - parametros e cronograma");
-setTitle(resumo, "A1:R1", "Resumo executivo - comparativo de estrategias");
+setTitle(resumo, "A1:P1", "Resumo executivo - comparativo de estrategias");
 header(motor, "A4:BS4", colors.teal);
 header(consorcioDireto, "A54:J54", colors.teal);
 header(consorcioDireto, "G4:J4", colors.teal);
@@ -1222,7 +1208,7 @@ header(consorcio, "A5:M5");
 header(amortizacao, "A5:Q5");
 header(checks, "A4:G4", colors.teal);
 header(fontes, "A4:E4", colors.teal);
-header(resumo, "A9:R9");
+header(resumo, "A9:P9");
 header(resumo, "A17:C17", colors.teal);
 
 // Restore input/formula styling after normalization.
@@ -1276,10 +1262,10 @@ console.log(`FINAL_SHEETS ${finalSheetNames.join(" | ")}`);
 
 const inspectSummary = await workbook.inspect({
   kind: "table",
-  range: "Resumo!A8:R13",
+  range: "Resumo!A8:P13",
   include: "values,formulas",
   tableMaxRows: 8,
-  tableMaxCols: 18,
+  tableMaxCols: 16,
   maxChars: 6000,
 });
 console.log("INSPECT_SUMMARY");
@@ -1624,18 +1610,64 @@ function runRentalComparabilityTests() {
   }
 }
 
+function runLowCashViabilityTests() {
+  const original = {
+    cash: premissas.getRange("B42").values[0][0],
+    reserve: premissas.getRange("B43").values[0][0],
+    use: premissas.getRange("B47").values[0][0],
+  };
+
+  try {
+    premissas.getRange("B42").values = [[400]];
+    premissas.getRange("B43").values = [[0]];
+    premissas.getRange("B47").values = [["Investimento para aluguel"]];
+
+    const statuses = resumo.getRange("O10:O13").values.flat();
+    const viabilityOutputs = resumo.getRange("I10:L13").values.flat();
+    const deficits = resumo.getRange("H10:H13").values.flat().map(asNumber);
+
+    if (!statuses.every((status) => status === "Inviavel")) {
+      throw new Error(`Caixa baixo deveria tornar todas as estrategias inviaveis, mas status = ${statuses.join(", ")}`);
+    }
+    if (!viabilityOutputs.every((value) => value === "Inviavel")) {
+      throw new Error("Caixa baixo deveria mostrar Inviavel em patrimonio, VPL e Gap.");
+    }
+    if (!deficits.every((value) => value > 1)) {
+      throw new Error("Caixa baixo deveria gerar deficit nao coberto em todas as estrategias.");
+    }
+
+    return {
+      cash: 400,
+      reserve: 0,
+      statuses,
+      deficits,
+    };
+  } finally {
+    premissas.getRange("B42").values = [[original.cash]];
+    premissas.getRange("B43").values = [[original.reserve]];
+    premissas.getRange("B47").values = [[original.use]];
+  }
+}
+
 const rentalComparabilityTests = runRentalComparabilityTests();
 const amortizationCashFreeTests = runAmortizationCashFreeTests();
+const lowCashViabilityTests = runLowCashViabilityTests();
 
 await fs.writeFile(
   correctionReportPath,
-  `# Relatorio de correcoes - amortizacao por caixa livre
+  `# Relatorio de correcoes - viabilidade de caixa
 
 Arquivo gerado: \`${path.basename(outputPath)}\`
-Data: 2026-06-21
+Data: 2026-06-22
 
 ## Correcoes implementadas
 
+- Corrigida a regra de capacidade: deficit de caixa nao vira capital adicional permitido.
+- A reserva pode absorver deficit mensal; se a reserva/saldo investido acaba, a estrategia passa a \`Inviavel\`.
+- No \`Resumo\`, estrategias inviaveis mostram \`Inviavel\` em \`Patrimonio\`, \`VPL vs base\` e \`Gap VF vs base\`.
+- As colunas de \`Patrimonio bruto nominal\` e \`Patrimonio bruto em R$ de hoje\` foram removidas do \`Resumo\`; o patrimonio bruto fica apenas como calculo interno de diagnostico no motor.
+- A coluna antes chamada de \`Capital adicional VF\` foi substituida por \`Deficit nao coberto VF\`, como diagnostico da inviabilidade.
+- O grafico usa apenas patrimonio de estrategias viaveis; estrategias inviaveis nao sao plotadas como patrimonio positivo.
 - Corrigida a logica do cenario \`Financiamento com amortizacao\`.
 - A amortizacao extra deixou de usar a parcela do consorcio como proxy.
 - A nova regra usa apenas a diferenca mensal entre \`caixa livre mensal\` e \`prestacao ordinaria SAC do mes\`.
@@ -1651,7 +1683,7 @@ Data: 2026-06-21
 - Estrategia 4 usa acesso pelo maior entre contemplacao do consorcio direto e disponibilidade.
 - O check \`Financiamento puro termina zerado\` agora valida o saldo no fim do prazo informado em \`Premissas\`, sem nota fixa de mes 360.
 - Adicionados checks especificos de aluguel comparavel em \`Checks\`, mantendo \`Checks!F30\` como status geral.
-- Preservada a separacao nominal/real: inflacao continua apenas como apresentacao, e nao altera Motor Caixa, aluguel, financiamento, consorcio, capital adicional, Gap VF ou VPL.
+- Preservada a separacao nominal/real: inflacao continua apenas como apresentacao, e nao altera Motor Caixa, aluguel, financiamento, consorcio, deficit nao coberto, Gap VF ou VPL.
 
 ## Validacoes executadas
 
@@ -1661,7 +1693,8 @@ Data: 2026-06-21
 - Varredura de formulas ou textos de retorno interno no workbook final.
 - Confirmacao de que \`Motor Caixa\` nao referencia inflacao.
 - Confirmacao de que \`VPL vs base\` nao referencia inflacao.
-- Confirmacao de que calculos centrais de financiamento, consorcio, aluguel, capital adicional e motor nao usam inflacao.
+- Confirmacao de que calculos centrais de financiamento, consorcio, aluguel, deficit nao coberto e motor nao usam inflacao.
+- Teste de caixa insuficiente: com caixa livre mensal de R$ ${Math.round(lowCashViabilityTests.cash).toLocaleString("pt-BR")} e reserva R$ ${Math.round(lowCashViabilityTests.reserve).toLocaleString("pt-BR")}, todas as quatro estrategias passam a \`Inviavel\` no resumo.
 - Teste amortizacao por caixa livre: caixa livre mensal de R$ ${Math.round(amortizationCashFreeTests.cashFree).toLocaleString("pt-BR")} em \`Premissas!B42\`; prestacao ordinaria inicial de R$ ${Math.round(amortizationCashFreeTests.firstOrdinaryPayment).toLocaleString("pt-BR")}; amortizacao extra inicial de R$ ${Math.round(amortizationCashFreeTests.firstExtraPayment).toLocaleString("pt-BR")}; quitacao no mes ${amortizationCashFreeTests.payoffMonth}.
 - Confirmacao de regressao: formulas de \`Amortizacao!J:Q\` nao referenciam consorcio, \`B32\` nem \`B36\`.
 - Teste Moradia propria: financiamento no mes ${rentalComparabilityTests.moradia.accessFinancing}, chaves no mes 1 e consorcio direto no mes ${rentalComparabilityTests.moradia.accessConsorcioDireto}. Estrategias 1, 2 e 3 ficaram sem aluguel pago; estrategia 4 pagou aluguel nos meses ${rentalComparabilityTests.moradia.consorcioRentMonths}; nenhum cenario recebeu aluguel.
@@ -1670,6 +1703,8 @@ Data: 2026-06-21
 ## Checks criados/alterados
 
 - \`Financiamento puro termina zerado\`: usa \`INDEX(Financiamento!M6:M485, Premissas!B13)\`.
+- \`Patrimonio bate status\`: valida que estrategia com deficit nao coberto exibe \`Inviavel\`.
+- \`Deficit nao coberto marca inviabilidade\`: valida que \`Status\` e \`Deficit nao coberto VF\` ficam coerentes.
 - \`Amortizacao extra = menor entre sobra de caixa e saldo amortizavel\`: valida \`Amortizacao!J\` contra a formula auxiliar em \`Amortizacao!Q\`.
 - \`Sobra para amortizar nunca negativa\`: valida que \`Amortizacao!P\` usa piso zero.
 - \`Caixa livre do cenario 2 vem de Premissas!B42\`: valida que \`Premissas!B35\` esta amarrada ao caixa livre mensal comum ao decisor.
@@ -1681,6 +1716,8 @@ Data: 2026-06-21
 
 ## Resultado financeiro da correcao
 
+A pessoa comparada nao pode ficar com caixa negativo. Portanto, uma estrategia que exige desembolso acima do caixa livre e acima da reserva disponivel deixa de ser uma alternativa executavel. O modelo agora diferencia patrimonio economico bruto de viabilidade de caixa: quando falta caixa, o resultado decisorio e \`Inviavel\`, nao um patrimonio ajustado artificial.
+
 A comparacao do financiamento com amortizacao passa a representar uma decisao mais coerente: a mesma pessoa usa sua capacidade mensal livre para pagar a prestacao SAC e direciona somente a sobra para amortizar o saldo devedor. Isso elimina a vinculacao indevida com o fluxo do consorcio e faz o beneficio do SAC aparecer corretamente: a queda da prestacao aumenta a sobra disponivel para amortizacao extra ao longo do tempo.
 
 A comparacao deixa de privilegiar indevidamente o consorcio direto quando a finalidade e moradia propria: enquanto a carta nao e contemplada, a estrategia 4 carrega custo de aluguel de espera. No modo investimento, a comparacao tambem fica simetrica: nenhuma estrategia paga aluguel, e a receita de aluguel entra apenas quando aquela estrategia tem acesso efetivo ao imovel.
@@ -1688,8 +1725,8 @@ A comparacao deixa de privilegiar indevidamente o consorcio direto quando a fina
 ## Simplificacoes mantidas
 
 - O modelo permanece nominal por padrao.
-- Inflacao anual esperada fica em 0% a.a. por padrao, mas e editavel.
-- Valorizacao do imovel fica em 0% a.a. por conservadorismo, mas e editavel.
+- Inflacao anual esperada fica em 6% a.a. por padrao, mas e editavel.
+- Valorizacao do imovel fica em 6% a.a. por padrao, mas e editavel.
 - Nao foram incluidos ITBI, cartorio, INCC detalhado, imposto de venda, tributacao completa de aluguel ou risco de nao contemplacao no mes preset.
 `,
   "utf8",

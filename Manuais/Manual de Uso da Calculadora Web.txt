@@ -1,0 +1,580 @@
+MANUAL DE USO DA CALCULADORA DE AQUISICAO WEB
+Calculadora de Aquisicao Web
+
+======================================================================
+1. FINALIDADE DA INTERFACE
+======================================================================
+
+A interface web compara quatro alternativas para a mesma pessoa adquirir
+um imovel:
+
+1. Financiamento sem amortizacao extraordinaria.
+2. Financiamento com amortizacao usando a disponibilidade mensal.
+3. Financiamento combinado com consorcio como interveniente quitante (IQ).
+4. Consorcio direto.
+
+O objetivo e comparar as alternativas sob as mesmas premissas de imovel,
+reserva, caixa mensal, horizonte, aluguel, rentabilidade, valorizacao e
+inflacao.
+
+A estrategia indicada e a que apresenta o maior Patrimonio Acumulado entre
+as alternativas consideradas viaveis pelo teste de caixa. A indicacao nao
+substitui analise de credito, proposta bancaria, regulamento do consorcio,
+contrato, avaliacao tributaria ou parecer juridico.
+
+======================================================================
+2. FLUXO RECOMENDADO DE USO
+======================================================================
+
+1. Escolha a finalidade: Investimento ou Moradia.
+2. Informe o valor do imovel, a reserva e o caixa livre mensal.
+3. Defina o horizonte da comparacao.
+4. Revise as premissas do financiamento.
+5. Revise as premissas do consorcio e os meses de contemplacao.
+6. Ative somente os tipos de lance que realmente serao considerados.
+7. Preencha aluguel, rentabilidade, valorizacao e inflacao.
+8. Verifique primeiro o Status de caixa de cada estrategia.
+9. Compare patrimonio apenas entre estrategias viaveis.
+10. Revise a tabela executiva e as premissas resumidas.
+11. Gere o PDF somente depois de validar todas as premissas.
+
+Os resultados sao recalculados automaticamente a cada alteracao. Nao existe
+botao separado para executar a simulacao.
+
+======================================================================
+3. NAVEGACAO E BOTOES
+======================================================================
+
+Premissas
+Leva ao painel lateral de entradas do cenario.
+
+Resultado
+Leva ao resumo da estrategia indicada e aos cards das quatro alternativas.
+
+Fluxo
+Leva aos graficos de ranking e evolucao do patrimonio.
+
+Proposta
+Leva ao resumo consultivo que pode ser apresentado ao cliente.
+
+Restaurar
+Recoloca todos os campos nos valores padrao da interface. Use com cuidado,
+pois os valores digitados nao sao salvos antes da restauracao.
+
+Gerar PDF
+Abre a caixa de impressao do navegador. Para criar um PDF, selecione uma
+opcao como "Salvar como PDF" no destino da impressao.
+
+======================================================================
+4. FINALIDADE DO IMOVEL
+======================================================================
+
+Investimento
+
+- O modelo considera recebimento de aluguel depois que o imovel estiver
+  adquirido e disponivel.
+- O aluguel recebido reduz a necessidade liquida de caixa da estrategia.
+- Antes da disponibilidade do imovel nao existe receita de aluguel.
+
+Moradia
+
+- O modelo considera aluguel pago pela pessoa ate o imovel estar disponivel.
+- Depois da disponibilidade, o aluguel pago deixa de ser contabilizado.
+- Nao e considerada receita de aluguel do imovel adquirido.
+
+A data efetiva de disponibilidade depende da estrategia:
+
+- Financiamento, financiamento com amortizacao e IQ: o maior valor entre o
+  mes de aquisicao pelo financiamento e o mes de entrega/chaves.
+- Consorcio direto: o maior valor entre o mes do consorcio e o mes de
+  entrega/chaves.
+
+Essa regra evita privilegiar uma alternativa com aluguel antes de ela poder
+usar ou locar o imovel.
+
+======================================================================
+5. IMOVEL E CAIXA
+======================================================================
+
+Valor do imovel novo
+Valor de referencia para a compra, entrada, credito, aluguel e valorizacao.
+
+Valor em reserva
+Recursos financeiros disponiveis no inicio da simulacao. A reserva pode
+cobrir desembolsos que excedam o caixa livre mensal. O saldo remanescente e
+remunerado pela rentabilidade liquida informada.
+
+Caixa livre mensal
+Valor maximo recorrente que a pessoa consegue destinar ao plano a cada mes.
+
+Interpretacao importante:
+
+- Nao e um valor adicional alem da parcela.
+- A parcela, o aluguel pago e os demais desembolsos consomem esse caixa.
+- Se o caixa mensal nao for suficiente, a diferenca consome a reserva.
+- Se a reserva acabar e ainda houver falta de caixa, a estrategia se torna
+  Inviavel.
+
+No financiamento com amortizacao, a amortizacao extraordinaria usa somente a
+sobra entre o caixa livre mensal e a prestacao SAC ordinaria do mes. Como a
+prestacao SAC tende a diminuir, a sobra e a amortizacao extraordinaria podem
+crescer ao longo do tempo.
+
+Horizonte de comparacao (meses)
+Mes em que os resultados finais sao comparados. Todas as alternativas usam o
+mesmo horizonte.
+
+O horizonte nao precisa ser igual ao prazo do financiamento ou do consorcio.
+Se for menor, o resultado ainda pode conter saldo devedor. Se for maior, o
+modelo continua acompanhando caixa, aluguel, rentabilidade e valorizacao ate
+o fim do horizonte.
+
+======================================================================
+6. PREMISSAS DO FINANCIAMENTO
+======================================================================
+
+Entrada (%)
+Percentual do valor do imovel pago no inicio. E aplicado nas alternativas de
+financiamento sem amortizacao, financiamento com amortizacao e IQ.
+
+Prazo (meses)
+Prazo contratual do financiamento no sistema SAC.
+
+Juros a.a. (%)
+Taxa efetiva anual usada para calcular os juros mensais equivalentes.
+
+TR a.a. (%)
+Correcao anual do saldo devedor, convertida para taxa mensal equivalente.
+
+Seguro mensal
+Valor mensal adicionado a prestacao enquanto o financiamento estiver ativo.
+
+Leitura da parcela inicial nos cards:
+
+- Financiamento sem amortizacao: mostra a prestacao do financiamento.
+- Financiamento com amortizacao: mostra a prestacao ordinaria e, se existir,
+  a amortizacao extra do primeiro mes em linhas separadas.
+- Financiamento + consorcio IQ: mostra separadamente a prestacao do
+  financiamento e a parcela do consorcio IQ.
+
+======================================================================
+7. PREMISSAS DO CONSORCIO
+======================================================================
+
+Taxa administracao (%)
+Percentual total da taxa de administracao considerado no plano.
+
+Fundo reserva (%)
+Percentual total do fundo de reserva do grupo.
+
+Seguro prestamista (%)
+Percentual considerado como encargo do consorcio conforme a logica atual do
+simulador. Confirme a forma de cobranca com a administradora antes de usar em
+uma proposta real.
+
+Prazo consorcio (meses)
+Quantidade de parcelas do plano de consorcio.
+
+Reajuste anual (%)
+Reajuste anual aplicado ao credito e as parcelas do consorcio.
+
+Mes contemplacao IQ
+Mes assumido para a contemplacao da carta usada como interveniente quitante.
+Nesse mes, a carta e usada para liquidar o saldo do financiamento conforme as
+premissas do modelo.
+
+Mes consorcio
+Mes assumido para a contemplacao e aquisicao no consorcio direto.
+
+Atencao:
+
+- Os meses de contemplacao sao premissas de simulacao, nao previsoes ou
+  garantias.
+- A contemplacao real depende de sorteio, lance, regras e disponibilidade do
+  grupo.
+- Simule meses alternativos para medir a sensibilidade do resultado.
+
+======================================================================
+8. LANCES DO CONSORCIO
+======================================================================
+
+Usar lance embutido
+Quando ativado, usa parte da propria carta como lance. Isso reduz o credito
+liquido disponivel para a aquisicao.
+
+Lance embutido (%)
+Percentual da carta usado como lance embutido. O campo so produz efeito quando
+a opcao correspondente esta marcada.
+
+Usar lance livre
+Quando ativado, inclui o percentual de lance livre na estrutura simulada.
+
+Lance livre (%)
+Percentual informado para o lance livre. A necessidade efetiva de recursos
+proprios deve ser confrontada com a reserva disponivel e com as regras do
+grupo.
+
+Usar lance fixo
+Quando ativado, inclui o percentual de lance fixo na estrutura simulada.
+
+Lance fixo (%)
+Percentual do lance fixo. O campo so produz efeito quando a opcao esta
+marcada.
+
+Boa pratica:
+
+- Desmarque os tipos de lance que nao fazem parte da proposta.
+- Nao deixe percentuais preenchidos contando que serao ignorados sem conferir
+  o estado das caixas de selecao.
+- Confirme limites, composicao e elegibilidade dos lances no regulamento da
+  administradora.
+
+======================================================================
+9. ALUGUEL E ECONOMIA
+======================================================================
+
+Entrega/chaves (mes)
+Primeiro mes em que o imovel pode ser usado ou alugado, respeitando tambem o
+momento de aquisicao de cada estrategia.
+
+Aluguel pago a.m. (%)
+Percentual mensal do valor do imovel usado para estimar o aluguel pago pela
+pessoa quando a finalidade selecionada e Moradia.
+
+Aluguel bruto a.m. (%)
+Percentual mensal do valor do imovel usado para estimar a receita bruta de
+aluguel quando a finalidade e Investimento.
+
+Reajuste aluguel a.a. (%)
+Reajuste anual aplicado ao aluguel pago ou recebido.
+
+Redutores do aluguel (%)
+Percentual descontado do aluguel bruto recebido para representar vacancia,
+administracao, manutencao, tributos e outros redutores agregados.
+
+Rentabilidade liquida a.a. (%)
+Retorno anual liquido aplicado ao saldo financeiro que permanece investido.
+Nao e a valorizacao do imovel.
+
+Valorizacao imovel a.a. (%)
+Crescimento anual assumido para o valor do imovel.
+
+Inflacao esperada a.a. (%)
+Taxa usada para converter o patrimonio final nominal em poder de compra de
+hoje. Ela nao substitui juros, TR, reajuste do consorcio, reajuste do aluguel
+ou valorizacao do imovel; cada taxa atua sobre uma base diferente.
+
+======================================================================
+10. AS QUATRO ESTRATEGIAS
+======================================================================
+
+Financiamento sem amortizacao
+
+- Compra no inicio por financiamento.
+- Paga entrada e prestacoes SAC sem amortizacao extraordinaria.
+- Mantem eventual sobra de caixa investida.
+
+Financiamento com amortizacao
+
+- Compra no inicio por financiamento.
+- Usa a sobra mensal depois da prestacao SAC para amortizar o saldo.
+- A amortizacao extra nunca deve depender de dinheiro inexistente.
+
+Financiamento + consorcio IQ
+
+- Compra no inicio por financiamento.
+- Mantem simultaneamente financiamento e consorcio ate a contemplacao.
+- Na contemplacao simulada, a carta atua como interveniente quitante.
+- O card mostra as duas parcelas iniciais separadamente.
+
+Consorcio
+
+- Nao compra o imovel antes da contemplacao simulada.
+- Aquisicao, uso e receita de aluguel dependem do mes do consorcio e da
+  entrega das chaves.
+- Pode exigir lance ou recursos proprios, conforme as opcoes selecionadas.
+
+======================================================================
+11. COMO LER O RESUMO SUPERIOR
+======================================================================
+
+Estrategia indicada
+Alternativa viavel com maior Patrimonio Acumulado em reais de hoje.
+
+Patrimonio Acumulado
+Patrimonio final da estrategia indicada, convertido para poder de compra de
+hoje pela inflacao esperada.
+
+Custo
+Soma nominal dos desembolsos da estrategia dentro do horizonte, incluindo os
+componentes aplicaveis, como entrada/lance, parcelas e aluguel pago.
+
+Importante:
+
+- Custo e um acumulado nominal.
+- Patrimonio Acumulado e exibido em reais de hoje.
+- Nao subtraia diretamente um do outro, pois estao em bases temporais
+  diferentes.
+- O ranking e feito pelo Patrimonio Acumulado, nao pelo menor custo isolado.
+
+Resumo executivo
+Texto automatico que informa a lideranca da melhor alternativa viavel e a
+diferenca para a segunda colocada. Se somente uma estrategia for viavel, o
+texto deixa isso explicito. Se nenhuma for viavel, pede revisao de caixa,
+reserva ou desembolsos.
+
+======================================================================
+12. COMO LER OS CARDS DAS ESTRATEGIAS
+======================================================================
+
+Indicada
+Marca a estrategia viavel com maior Patrimonio Acumulado.
+
+Cenario 1, 2, 3 ou 4
+Identifica as demais estrategias viaveis. O numero nao representa ranking.
+
+Inviavel
+Indica que a estrategia exigiu dinheiro alem do caixa livre mensal e da
+reserva disponivel em pelo menos um mes do horizonte.
+
+Patrimonio Acumulado
+Resultado patrimonial em reais de hoje. Em estrategia inviavel, o valor e
+substituido por "Inviavel" porque um patrimonio dependente de capital que a
+pessoa nao possui nao deve ser comparado.
+
+Parcela inicial
+Mostra a composicao do primeiro desembolso mensal recorrente. No IQ aparecem
+financiamento e consorcio separadamente. Na amortizacao, a parcela ordinaria e
+a amortizacao extra podem aparecer separadas.
+
+Entrada ou lance
+Desembolso inicial relevante de cada estrategia.
+
+Status de caixa
+
+- Viavel: o caixa mensal e a reserva sustentam todos os meses analisados.
+- Inviavel no mes N: o primeiro deficit nao coberto ocorreu no mes N.
+
+Deficit nao coberto
+Soma das faltas de caixa mensais sem cobertura. Esse valor serve para
+diagnostico; nao deve ser tratado como emprestimo automatico ou aporte futuro.
+
+======================================================================
+13. GRAFICOS
+======================================================================
+
+Ranking - Patrimonio Acumulado
+Compara o patrimonio final das estrategias viaveis. Estrategias inviaveis nao
+recebem barra patrimonial comparavel.
+
+Evolucao do Patrimonio Acumulado
+Mostra a trajetoria patrimonial ao longo do tempo somente para alternativas
+viaveis. A curva destacada corresponde a estrategia indicada.
+
+Uma curva temporariamente negativa nao significa necessariamente inviabilidade
+de caixa. O status de viabilidade depende da capacidade de pagar os fluxos
+mensais com caixa e reserva, e nao apenas do sinal do patrimonio contabilizado
+em um mes.
+
+======================================================================
+14. TABELA EXECUTIVA
+======================================================================
+
+Estrategia
+Nome da alternativa e observacao resumida sobre seu funcionamento.
+
+Entrada/lance
+Valor inicial relevante da estrategia.
+
+Parcela inicial
+Composicao da primeira parcela ou dos pagamentos simultaneos.
+
+Aquisicao
+Mes em que o imovel entra no patrimonio da estrategia.
+
+Custo
+Desembolsos nominais acumulados no horizonte.
+
+Patrimonio Acumulado
+Patrimonio final em reais de hoje, ou "Inviavel" quando faltar caixa.
+
+Status de caixa
+Resultado do teste de capacidade financeira mensal.
+
+Use a tabela para confirmar que as quatro alternativas estao usando premissas
+coerentes antes de aceitar a recomendacao automatica.
+
+======================================================================
+15. PREMISSAS RESUMIDAS E PROPOSTA
+======================================================================
+
+Faixa de premissas
+Exibe os principais valores usados: imovel, reserva, caixa mensal, horizonte,
+financiamento, consorcio, finalidade e rentabilidade.
+
+Resumo da simulacao
+Apresenta uma conclusao automatica e lista premissas criticas. A conclusao
+considera somente estrategias viaveis.
+
+Antes de apresentar ao cliente:
+
+- Confira valor do imovel, entrada, reserva e caixa mensal.
+- Confira prazos, taxas e TR da proposta bancaria.
+- Confira taxas, reajuste, credito e regras do grupo de consorcio.
+- Confira os meses de contemplacao usados como hipotese.
+- Confira finalidade, aluguel, redutores, valorizacao e inflacao.
+- Rode cenarios conservador, base e otimista quando houver incerteza material.
+
+======================================================================
+16. GERACAO DO PDF
+======================================================================
+
+1. Revise os campos e resultados na tela.
+2. Clique em Gerar PDF.
+3. Na janela do navegador, escolha Salvar como PDF.
+4. Use orientacao e escala padrao, salvo necessidade especifica.
+5. Verifique a visualizacao antes de salvar.
+
+O relatorio impresso inclui:
+
+- Descricao das quatro alternativas.
+- Recomendacao do cenario.
+- Patrimonio e custo.
+- Graficos comparativos.
+- Premissas principais.
+
+O PDF reflete o estado atual da tela. O app nao mantem historico de cenarios e
+nao salva automaticamente os valores digitados.
+
+======================================================================
+17. TESTE DE VIABILIDADE DE CAIXA
+======================================================================
+
+Em cada mes, o modelo segue esta ordem conceitual:
+
+1. Adiciona o caixa livre mensal.
+2. Adiciona eventual aluguel recebido.
+3. Deduz entrada/lance, parcelas e eventual aluguel pago.
+4. Usa o saldo investido e a reserva para cobrir diferencas.
+5. Se ainda faltar dinheiro, registra deficit nao coberto.
+
+Uma estrategia e viavel somente quando nao depende de deficit nao coberto no
+horizonte analisado.
+
+Exemplo de interpretacao:
+
+- Caixa livre mensal: R$ 400.
+- Reserva: R$ 0.
+- Parcela inicial: R$ 630.
+
+Se nao houver outra entrada de caixa suficiente no mes, faltam R$ 230. Como
+nao existe reserva para cobrir a diferenca, a estrategia deve aparecer como
+Inviavel, e nao com patrimonio positivo.
+
+======================================================================
+18. ERROS DE USO A EVITAR
+======================================================================
+
+- Tratar caixa livre mensal como dinheiro adicional alem da parcela.
+- Comparar patrimonio de estrategia inviavel.
+- Interpretar contemplacao simulada como garantia.
+- Subtrair custo nominal do patrimonio em reais de hoje.
+- Informar rentabilidade bruta quando o campo pede rentabilidade liquida.
+- Contar aluguel recebido antes da aquisicao ou entrega das chaves.
+- Usar simultaneamente lances incompativeis com o regulamento real.
+- Confundir reajuste do consorcio com inflacao geral.
+- Confundir valorizacao do imovel com rentabilidade do saldo financeiro.
+- Escolher somente pela parcela inicial sem observar o custo, o prazo, o
+  saldo devedor, o risco de contemplacao e a viabilidade mensal.
+
+======================================================================
+19. ANALISE DE SENSIBILIDADE RECOMENDADA
+======================================================================
+
+Para uma decisao mais robusta, altere uma premissa por vez e observe se a
+estrategia indicada muda.
+
+Cenarios recomendados:
+
+- Contemplacao mais cedo, base e mais tarde.
+- Rentabilidade menor, base e maior.
+- Valorizacao do imovel menor, base e maior.
+- Inflacao menor, base e maior.
+- Aluguel com maior vacancia/redutores.
+- TR e juros em niveis conservadores.
+- Caixa livre mensal com margem para imprevistos.
+
+Se uma estrategia so vence em premissas muito otimistas, a recomendacao deve
+ser tratada como sensivel e nao como conclusao robusta.
+
+======================================================================
+20. SOLUCAO DE PROBLEMAS
+======================================================================
+
+Os resultados nao mudam ao editar um campo
+
+- Saia do campo ou pressione Tab para forcar a formatacao do valor monetario.
+- Confira se o numero foi digitado em formato reconhecivel.
+- Recarregue a pagina e repita a entrada.
+
+Um percentual parece cem vezes maior ou menor
+
+- Digite percentuais como numeros usuais: 12 para 12%, 0,5 para 0,5%.
+- Nao digite 0,12 quando a intencao for 12%.
+
+Uma estrategia aparece inviavel
+
+- Veja o primeiro mes de deficit no card.
+- Compare a parcela inicial com o caixa livre mensal.
+- Verifique entrada/lance e reserva.
+- Verifique aluguel pago antes das chaves.
+- Revise prazo, valor do imovel e premissas de contemplacao.
+
+Nenhuma estrategia aparece no grafico de patrimonio
+
+- Todas podem estar inviaveis. Revise caixa, reserva e desembolsos.
+
+O PDF nao e gerado automaticamente
+
+- O botao abre a impressao do navegador. Selecione Salvar como PDF.
+- Verifique se o navegador bloqueou a janela de impressao.
+
+Caracteres ou icones aparecem incorretamente
+
+- Abra a pagina em navegador moderno.
+- Confirme que os arquivos do projeto foram mantidos na mesma estrutura.
+- Para os icones externos, confirme a conexao com a internet.
+
+======================================================================
+21. CHECKLIST FINAL ANTES DA RECOMENDACAO
+======================================================================
+
+[ ] A finalidade Investimento ou Moradia esta correta.
+[ ] O valor do imovel corresponde ao bem analisado.
+[ ] A reserva informada esta realmente disponivel.
+[ ] O caixa livre mensal e sustentavel e nao inclui a propria parcela.
+[ ] O horizonte e igual para todas as alternativas.
+[ ] Juros, TR, seguro, prazo e entrada foram confirmados.
+[ ] Taxas, prazo e reajuste do consorcio foram confirmados.
+[ ] Os meses de contemplacao foram tratados como hipoteses.
+[ ] Os lances ativos sao compativeis com a proposta real.
+[ ] O aluguel so comeca depois da aquisicao e das chaves.
+[ ] Rentabilidade, valorizacao e inflacao foram revisadas.
+[ ] Somente estrategias viaveis foram comparadas por patrimonio.
+[ ] Custo nominal nao foi misturado diretamente com patrimonio real.
+[ ] O PDF foi revisado antes de ser apresentado.
+
+======================================================================
+22. DOCUMENTACAO COMPLEMENTAR
+======================================================================
+
+Para entender as formulas e o metodo financeiro por tras dos resultados,
+consulte:
+
+- Manual de Calculos da Planilha.txt
+
+Para o uso detalhado da planilha Excel, consulte:
+
+- Manual de Uso da Planilha.txt
+
+Fim do manual.

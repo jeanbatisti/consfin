@@ -1,16 +1,19 @@
-# ConsFin
+# Calculadora de Aquisição
 
 Ferramenta para comparar cenários de consórcio e financiamento imobiliário.
 
 ## Como usar
 
-Abra o arquivo `web_app/index.html` no navegador.
+- Planilha: abra `Calculadora de Aquisição.xlsx`.
+- Interface web: abra `Calculadora de Aquisição Web.html`.
+- Documentação: consulte a pasta `Manuais`.
 
 Se o GitHub Pages estiver ativado para este repositório, a página inicial redireciona automaticamente para a interface em `web_app/`.
 
 ## Estrutura
 
-- `web_app/`: interface principal da ferramenta.
+- `web_app/`: arquivos internos da Calculadora de Aquisição Web.
+- `Manuais/`: documentação de uso e metodologia.
 - `output/pdf/`: modelos de relatório em PDF.
 - `tmp/pdfs/create_report_design_models.py`: gerador dos modelos de PDF.
 - `build_spreadsheet/`: scripts auxiliares da planilha.

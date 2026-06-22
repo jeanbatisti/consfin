@@ -1,0 +1,433 @@
+MANUAL DE USO DA PLANILHA
+Calculadora de Aquisição
+
+Arquivo da planilha:
+Calculadora de Aquisição.xlsx
+
+
+1. O QUE ESSA PLANILHA FAZ
+
+Essa planilha compara 4 formas de comprar um imóvel:
+
+1) Comprar via financiamento sem amortização.
+2) Comprar via financiamento com amortização.
+3) Comprar via financiamento e usar um consórcio depois para quitar o financiamento.
+4) Comprar direto via consórcio.
+
+Ela mostra:
+- Quanto cada estratégia custa.
+- Quanto sobra ou falta de patrimônio no final.
+- Quanto dinheiro poderia ser investido ao longo do tempo.
+- Qual estratégia deixa o cliente melhor em um prazo escolhido.
+- O valor nominal e o valor em "R$ de hoje", quando você informar inflação.
+
+
+2. REGRA MAIS IMPORTANTE
+
+Mexa principalmente na aba PREMISSAS.
+Para a estratégia de compra direto por consórcio, também existe edição na aba CONSORCIO DIRETO.
+
+Não mexa nas abas de cálculo, a menos que você saiba exatamente o que está fazendo.
+
+As abas de cálculo são:
+- Motor Caixa
+- Financiamento
+- Consorcio IQ
+- Amortizacao
+- Checks
+- Fontes
+
+Se você quer mudar o cenário geral, vá em PREMISSAS.
+Se você quer ajustar detalhes da compra direto por consórcio, vá também em CONSORCIO DIRETO.
+Se você quer ver o resultado, vá em RESUMO.
+
+
+3. ABAS PRINCIPAIS
+
+RESUMO
+É a tela principal de resultados.
+Use essa aba para comparar as 4 estratégias.
+
+PREMISSAS
+É onde você coloca os dados do cliente, do imóvel, do financiamento, do consórcio, do aluguel, da rentabilidade e da inflação.
+
+CONSORCIO DIRETO
+Também é uma aba de edição.
+Use essa aba para revisar e ajustar parâmetros específicos da estratégia 4, que é a compra direto via consórcio.
+É aqui que ficam detalhes operacionais do consórcio direto, como crédito, lances e cronograma dessa estratégia.
+
+CHECKS
+Mostra se a planilha está saudável.
+Se aparecer "OK", está tudo certo.
+Se aparecer "Revisar", existe alguma premissa ou fórmula que precisa ser investigada.
+
+FONTES
+Mostra de onde vem cada premissa e para que ela serve.
+
+MOTOR CAIXA
+É o motor mensal completo.
+Mostra mês a mês o que acontece em cada estratégia.
+Normalmente você não precisa mexer aqui.
+
+
+4. COMO USAR EM 5 PASSOS
+
+PASSO 1
+Abra a aba PREMISSAS.
+
+PASSO 2
+Preencha ou revise os dados do imóvel, financiamento, consórcio, reserva, renda disponível, aluguel e inflação.
+
+PASSO 2.1
+Se for analisar compra direto via consórcio, abra também a aba CONSORCIO DIRETO e confira os parâmetros específicos dessa estratégia.
+
+PASSO 3
+Vá para a aba CHECKS.
+Veja se o status está "OK".
+
+PASSO 4
+Vá para a aba RESUMO.
+Compare as 4 estratégias.
+
+PASSO 5
+Escolha a estratégia olhando principalmente:
+- Status de caixa.
+- Patrimônio nominal.
+- Patrimônio em R$ de hoje.
+- VPL vs base.
+- Gap VF vs base.
+- Custo total.
+- Custo efetivo.
+
+
+5. CAMPOS MAIS IMPORTANTES EM PREMISSAS
+
+Valor do imóvel novo
+É o preço do imóvel que o cliente quer comprar.
+
+Entrada
+É o percentual de entrada usado no financiamento.
+
+Prazo do financiamento
+Quantidade de meses do financiamento.
+
+Juros do financiamento
+Taxa anual do financiamento.
+
+TR
+Correção anual usada no saldo devedor do financiamento.
+
+Seguro mensal
+Valor mensal de seguro do financiamento.
+
+Taxa de administração do consórcio
+Percentual total de administração cobrado sobre o crédito.
+
+Fundo reserva
+Percentual total de fundo reserva cobrado sobre o crédito.
+
+Seguro prestamista do consórcio
+Percentual total de seguro cobrado sobre o crédito.
+
+Prazo do consórcio
+Quantidade de meses do consórcio.
+
+Reajuste do consórcio
+Reajuste anual do crédito e da parcela.
+
+Mês de contemplação
+Mês em que o consórcio é considerado contemplado.
+Exemplo: mês 60 significa que a carta fica disponível no mês 60.
+
+Horizonte de comparação
+É o prazo usado para comparar patrimônio.
+Exemplo: 360 meses compara tudo em 30 anos.
+
+Rentabilidade líquida anual
+É quanto o dinheiro investido rende ao ano, já líquido.
+Preset usado: 12% ao ano.
+
+Caixa livre mensal
+É quanto o cliente consegue guardar/investir por mês antes de pagar os fluxos do imóvel.
+Exemplo: se ele consegue poupar R$ 7.000 por mês, coloque R$ 7.000.
+
+Valor em reserva
+É o dinheiro que o cliente já tem disponível no início.
+Esse valor deve ser pelo menos igual à maior entrada exigida entre as estratégias.
+Se uma estratégia não usa entrada, a planilha considera que esse dinheiro pode ficar investido.
+
+Uso do imóvel
+Escolha se o imóvel será:
+- Moradia própria.
+- Investimento para aluguel.
+
+Se for moradia própria:
+Use quando a pessoa está escolhendo onde morar.
+Enquanto a estratégia ainda não permite morar no imóvel comprado, aluguel pago sai do bolso como custo de espera.
+No financiamento e no financiamento + IQ, a espera termina no maior entre mês de aquisição via financiamento e mês das chaves/disponibilidade.
+No consórcio direto, a espera termina no maior entre mês de contemplação do consórcio direto e mês das chaves/disponibilidade.
+Nesse modo não existe aluguel recebido.
+
+Se for investimento para aluguel:
+Use quando o imóvel comprado será alugado para gerar renda.
+Nesse modo não existe aluguel pago desse imóvel, porque a moradia do cliente está fora da comparação.
+O aluguel recebido líquido entra somente depois que a estratégia já tem o imóvel e ele está disponível.
+No financiamento e no financiamento + IQ, isso começa no maior entre aquisição via financiamento e disponibilidade.
+No consórcio direto, isso começa no maior entre contemplação do consórcio direto e disponibilidade.
+
+Inflação anual esperada
+Serve apenas para mostrar valores em "R$ de hoje".
+Ela não muda o financiamento, o consórcio, o motor mensal nem o VPL.
+
+
+6. COMO LER O RESUMO
+
+Cada linha do RESUMO é uma estratégia.
+
+Estratégia 1
+Financiamento sem amortização.
+O cliente paga o financiamento normal até o fim.
+
+Estratégia 2
+Financiamento com amortização.
+O cliente usa a sobra entre o caixa livre mensal e a prestação SAC ordinária do mês para amortizar o financiamento.
+Como as prestações SAC tendem a cair ao longo do tempo, a sobra mensal para amortização extra tende a crescer.
+Esse cenário não usa a parcela do consórcio como fonte de amortização.
+
+Estratégia 3
+Financiamento + consórcio para interveniente quitante.
+O cliente financia primeiro e usa a carta do consórcio no mês de contemplação para quitar o saldo devedor.
+
+Estratégia 4
+Consórcio direto.
+O cliente compra pelo consórcio, conforme o mês de contemplação e as regras de lance.
+
+
+7. O QUE SIGNIFICA CADA RESULTADO
+
+Custo total
+Soma dos pagamentos feitos na estratégia.
+Serve para entender desembolso.
+
+Custo efetivo
+Mostra o custo da estratégia de forma mais comparável.
+Use junto com patrimônio, não sozinho.
+
+Patrimônio nominal
+Patrimônio final depois de considerar saldo investido, imóvel e dívidas, apenas se a estratégia couber no caixa.
+Se aparecer "Inviável", a estratégia não deve ser usada como recomendação.
+
+Patrimônio em R$ de hoje
+Patrimônio nominal convertido para dinheiro de hoje usando a inflação.
+Use esse campo quando quiser tirar o efeito visual da inflação.
+
+VPL vs base
+Compara a estratégia contra a alternativa de não comprar e apenas investir.
+Se for positivo, a estratégia ficou melhor que a base.
+Se for negativo, ficou pior que a base.
+
+Gap VF vs base
+Diferença futura contra a base.
+Também compara com o cenário de não comprar e investir.
+
+Saldo investido
+Dinheiro acumulado em investimento ao final do horizonte.
+
+Saldo devedor
+Dívida que ainda resta no final do horizonte.
+
+Status
+Indica a situação da estratégia.
+
+Observação
+Explica algum detalhe importante da linha.
+
+
+8. COMO DECIDIR QUAL ESTRATÉGIA É MELHOR
+
+Não escolha olhando só para a menor parcela.
+
+Olhe nesta ordem:
+
+1) Status de caixa.
+Se aparecer "Inviável", a estratégia exige mais caixa do que a reserva e o fluxo mensal conseguem cobrir.
+
+2) Patrimônio em R$ de hoje.
+Mostra quem deixa o cliente mais rico em poder de compra atual, apenas entre estratégias viáveis.
+
+3) VPL vs base.
+Mostra se a estratégia venceu ou perdeu da alternativa de investir o dinheiro.
+
+4) Saldo devedor.
+Veja se ainda sobra dívida no final.
+
+5) Custo total.
+Mostra quanto saiu do bolso, mas não conta sozinho a história toda.
+
+6) Risco prático.
+Consórcio depende de contemplação. Financiamento depende de aprovação de crédito. Aluguel depende de vacância, inadimplência e mercado.
+
+
+9. CUIDADO COM A ENTRADA
+
+Se uma estratégia exige entrada e outra não, isso muda a comparação.
+
+Exemplo simples:
+- Financiamento exige R$ 40.000 de entrada.
+- Consórcio direto não exige entrada no início.
+
+Então, no cenário de consórcio, esses R$ 40.000 podem continuar investidos.
+
+Por isso existe o campo "Valor em reserva".
+Ele representa o dinheiro disponível no começo.
+
+Regra prática:
+O valor em reserva deve ser pelo menos a maior entrada entre as estratégias.
+
+
+10. CUIDADO COM MORADIA X INVESTIMENTO
+
+Se o imóvel é para moradia:
+- Aluguel pago representa o custo de esperar até conseguir morar no imóvel comprado.
+- Financiamento e financiamento + IQ param de pagar aluguel no maior entre aquisição via financiamento e disponibilidade.
+- Consórcio direto para de pagar aluguel no maior entre contemplação direta e disponibilidade.
+- Não entra aluguel recebido.
+
+Se o imóvel é para investimento:
+- O cliente mora em outro lugar, fora da comparação.
+- Não existe aluguel pago desse imóvel.
+- Aluguel recebido líquido entra só depois que a estratégia tem acesso ao imóvel e ele está disponível.
+- Esse aluguel recebido pode ser investido.
+
+Essa seleção fica em PREMISSAS, no campo "Uso do imóvel".
+
+
+11. CUIDADO COM INFLAÇÃO
+
+A inflação na planilha serve para apresentação.
+
+Ela transforma valores futuros nominais em "R$ de hoje".
+
+Ela não muda:
+- Parcela do financiamento.
+- Saldo devedor do financiamento.
+- Parcela do consórcio.
+- Reajuste do consórcio.
+- Aluguel.
+- Motor Caixa.
+- VPL.
+
+Exemplo:
+Se o patrimônio nominal em 30 anos for R$ 2.000.000, esse valor pode parecer grande.
+Ao colocar inflação, a planilha mostra quanto isso representa em poder de compra de hoje.
+
+
+12. CUIDADO COM CONSÓRCIO
+
+O consórcio tem componentes separados:
+- Taxa de administração.
+- Fundo reserva.
+- Seguro prestamista.
+- Lance embutido.
+- Lance livre.
+- Lance fixo.
+
+As premissas gerais do consórcio ficam em PREMISSAS.
+Os detalhes específicos da estratégia de compra direto via consórcio ficam na aba CONSORCIO DIRETO.
+
+Todos os lances são calculados sobre o crédito.
+
+Se houver lance embutido e lance fixo ao mesmo tempo, a descapitalização do cliente é só a diferença que ele precisa colocar do bolso.
+
+Exemplo:
+Crédito: R$ 200.000
+Lance embutido: 20% = R$ 40.000
+Lance fixo: 40% = R$ 80.000
+Dinheiro do bolso: R$ 40.000
+
+Porque R$ 40.000 vêm do próprio crédito e R$ 40.000 saem do cliente.
+
+
+13. O QUE NÃO FAZER
+
+Não edite fórmulas no RESUMO.
+
+Não edite fórmulas no MOTOR CAIXA.
+
+Não apague linhas ou colunas.
+
+Não mude nomes das abas.
+
+Não coloque prazo maior que o limite suportado pela planilha.
+
+Não compare estratégias com "Valor em reserva" menor que a maior entrada.
+
+Não use VPL real, porque a planilha mantém o VPL nominal.
+
+
+14. SE DER ERRO
+
+Vá na aba CHECKS.
+
+Se o status geral estiver "OK", o modelo está consistente.
+
+Se aparecer "Revisar":
+1) Veja qual linha deu problema.
+2) Volte na aba PREMISSAS.
+3) Confira se algum campo ficou vazio, negativo ou incoerente.
+4) Confira se o prazo informado está dentro do limite da planilha.
+5) Confira se o valor em reserva é suficiente.
+
+Erros comuns:
+- Valor do imóvel apagado.
+- Prazo maior que o suportado.
+- Mês de contemplação maior que o prazo do consórcio.
+- Reserva menor que a entrada necessária.
+- Campo percentual digitado como número errado.
+
+Exemplo de percentual:
+Para 20%, digite 20% ou 0,20, conforme o comportamento do Excel.
+Não digite 20 como se fosse 20%, porque isso pode virar 2000%.
+
+
+15. ORDEM RECOMENDADA PARA APRESENTAR AO CLIENTE
+
+1) Explique as 4 estratégias.
+2) Mostre as premissas usadas.
+3) Mostre o RESUMO.
+4) Verifique primeiro o Status de caixa.
+5) Descarte estratégias marcadas como Inviável.
+6) Compare patrimônio em R$ de hoje.
+7) Compare VPL vs base.
+8) Mostre o custo total.
+9) Explique os riscos que a planilha não garante.
+
+
+16. LIMITAÇÕES IMPORTANTES
+
+A planilha é um simulador.
+Ela não garante aprovação de crédito.
+Ela não garante contemplação real do consórcio.
+Ela não substitui contrato, proposta bancária ou regulamento do grupo de consórcio.
+
+Não estão modelados de forma completa:
+- ITBI.
+- Escritura e registro.
+- Imposto de renda.
+- Vacância de aluguel.
+- Inadimplência de inquilino.
+- Manutenção do imóvel.
+- Taxas específicas de banco ou administradora.
+- Risco de não contemplação no mês planejado.
+
+Use a planilha para comparar estratégias.
+Antes de fechar negócio, valide com banco, administradora, contador e jurídico, quando aplicável.
+
+
+17. FRASE CURTA PARA LEMBRAR
+
+Premissas é onde mexe no cenário geral.
+Consorcio Direto é onde mexe nos detalhes da compra direto via consórcio.
+Resumo é onde decide.
+Checks é onde confere se está tudo certo.
+Motor Caixa é onde a planilha trabalha, então não cutuque.

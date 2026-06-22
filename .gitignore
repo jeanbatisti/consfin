@@ -4,6 +4,7 @@ outputs/
 output/pdf/previews/
 Ável _ Simulador Consórcio x Financiamento.pdf
 *.xlsx
+!Calculadora de Aquisição.xlsx
 node_modules/
 **/__pycache__/
 *.pyc
