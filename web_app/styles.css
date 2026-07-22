@@ -20,6 +20,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -145,6 +149,13 @@ a {
   color: var(--ink);
 }
 
+.icon-button.is-applied {
+  border-color: rgba(29, 192, 119, 0.3);
+  background: rgba(29, 192, 119, 0.12);
+  color: var(--green);
+  box-shadow: none;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 360px minmax(0, 1fr);
@@ -227,6 +238,16 @@ h3 {
   font-size: 0.82rem;
 }
 
+.field-span {
+  display: grid;
+  gap: 7px;
+}
+
+.field-label {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.82rem;
+}
+
 .input-section input[type="number"],
 .input-section input[type="text"] {
   width: 100%;
@@ -278,6 +299,15 @@ h3 {
 .segmented button.is-active {
   background: var(--accent);
   color: var(--ink);
+}
+
+.segmented.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.segmented.three button {
+  padding-inline: 6px;
+  font-size: 0.75rem;
 }
 
 details {
@@ -387,7 +417,7 @@ details[open] summary::after {
 
 .strategy-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -1078,22 +1108,20 @@ tbody tr:hover {
 
   .top-actions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, 44px);
     width: 100%;
-    justify-content: stretch;
+    justify-content: start;
   }
 
   .top-actions .icon-button {
+    width: 44px;
+    height: 44px;
     min-width: 0;
-    padding: 9px 8px;
-    font-size: 0.92rem;
+    padding: 0;
   }
 
   .top-actions .icon-button span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none;
   }
 
   .workspace {

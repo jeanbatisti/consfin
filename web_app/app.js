@@ -1,7 +1,9 @@
 const MAX_MONTHS = 480;
 
 const defaultInputs = {
-  usage: "Investimento para aluguel",
+  assetType: "Imovel",
+  financingSystem: "SAC",
+  usage: "Investimento",
   propertyValue: 200000,
   reserve: 90000,
   monthlyCash: 7000,
@@ -9,7 +11,7 @@ const defaultInputs = {
   entryPct: 0.2,
   finMonths: 420,
   annualInterest: 0.12,
-  annualTR: 0.02,
+  annualTR: 0,
   insurance: 150,
   consAdminPct: 0.24,
   consReservePct: 0.02,
@@ -19,20 +21,31 @@ const defaultInputs = {
   iqMonth: 60,
   directMonth: 60,
   useEmbeddedBid: true,
-  embeddedBidPct: 0.2,
+  embeddedBidPct: 0.25,
   useFreeBid: false,
   freeBidPct: 0,
   useFixedBid: true,
-  fixedBidPct: 0.2,
+  fixedBidPct: 0.25,
   availabilityMonth: 1,
   rentPaidPct: 0.0035,
   rentReceivedPct: 0.004,
   rentAdjustPct: 0.06,
   rentalDeductionsPct: 0.2,
   annualReturn: 0.12,
-  appreciationPct: 0.06,
+  propertyAppreciationPct: 0.06,
+  vehicleDepreciationPct: -0.15,
   inflationPct: 0.06,
   acquisitionFinMonth: 1,
+  cardEnabled: true,
+  cardPurchaseMonth: 1,
+  cardUseMonth: 1,
+  cardGrossCredit: 200000,
+  cardRestrictions: 0,
+  cardPrice: 45000,
+  cardTransferFee: 2000,
+  cardRemainingMonths: 180,
+  cardInstallment: 1200,
+  cardAdjustPct: 0.06,
 };
 
 const percentFields = new Set([
@@ -51,8 +64,9 @@ const percentFields = new Set([
   "rentAdjustPct",
   "rentalDeductionsPct",
   "annualReturn",
-  "appreciationPct",
+  "propertyAppreciationPct",
   "inflationPct",
+  "cardAdjustPct",
 ]);
 
 const integerFields = new Set([
@@ -62,38 +76,60 @@ const integerFields = new Set([
   "iqMonth",
   "directMonth",
   "availabilityMonth",
+  "acquisitionFinMonth",
+  "cardPurchaseMonth",
+  "cardUseMonth",
 ]);
 
-const booleanFields = new Set(["useEmbeddedBid", "useFreeBid", "useFixedBid"]);
+const booleanFields = new Set([
+  "useEmbeddedBid",
+  "useFreeBid",
+  "useFixedBid",
+  "cardEnabled",
+]);
 
-const currencyFields = new Set(["propertyValue", "reserve", "monthlyCash", "insurance"]);
+const currencyFields = new Set([
+  "propertyValue",
+  "reserve",
+  "monthlyCash",
+  "insurance",
+  "cardGrossCredit",
+  "cardRestrictions",
+  "cardPrice",
+  "cardTransferFee",
+  "cardInstallment",
+]);
 
 const strategyColors = {
   fin: "#111111",
   amort: "#115e59",
   iq: "#244d62",
   cons: "#8f3d49",
+  card: "#766300",
 };
 
 const strategyNames = {
   fin: "Financiamento sem amortização",
   amort: "Financiamento com amortização",
   iq: "Financiamento + consórcio IQ",
-  cons: "Consórcio",
+  cons: "Consórcio direto",
+  card: "Compra de carta contemplada",
 };
 
 const shortNames = {
   fin: "Fin. sem amort.",
   amort: "Fin. amort.",
   iq: "Fin. + IQ",
-  cons: "Consórcio",
+  cons: "Consórcio direto",
+  card: "Carta contemplada",
 };
 
 const observations = {
-  fin: "Compra por financiamento; aluguel depende do uso e das chaves.",
-  amort: "Pagamento extra usa a sobra entre caixa livre mensal e prestação SAC do mês.",
-  iq: "Financiamento compra no início; carta quita no mês de contemplação.",
-  cons: "Sem entrada inicial; compra e uso/aluguel só após contemplação e chaves.",
+  fin: "Compra por financiamento no mês inicial pelo valor atual do bem.",
+  amort: "Pagamento extra usa a sobra depois da prestação ordinária SAC ou PRICE.",
+  iq: "A carta quita o financiamento, mas as parcelas futuras do consórcio permanecem como obrigação.",
+  cons: "Antes da contemplação reconhece direito da cota e obrigação; depois reconhece o bem.",
+  card: "Compra carta já contemplada e considera custo inicial, complemento e parcelas restantes.",
 };
 
 function monthlyRate(annualRate) {
@@ -104,6 +140,23 @@ function annualStepFactor(annualRate, month) {
   return Math.pow(1 + annualRate, Math.floor((month - 1) / 12));
 }
 
+function assetValueAtMonth(p, month) {
+  return Math.max(0, p.propertyValue * Math.pow(1 + p.selectedAssetRate, (month - 1) / 12));
+}
+
+function addRemainingObligations(rows, paymentKey, discountRate) {
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    if (index === rows.length - 1) {
+      rows[index].obligation = 0;
+    } else {
+      rows[index].obligation =
+        (rows[index + 1].obligation + (rows[index + 1][paymentKey] || 0)) /
+        (1 + discountRate);
+    }
+  }
+  return rows;
+}
+
 function clampNumber(value, min, max) {
   const number = Number.isFinite(value) ? value : min;
   return Math.min(max, Math.max(min, number));
@@ -112,14 +165,29 @@ function clampNumber(value, min, max) {
 function normalizeInputs(raw) {
   const p = { ...defaultInputs, ...raw };
 
+  if (raw && raw.appreciationPct !== undefined) {
+    if ((raw.assetType || p.assetType) === "Veiculo" && raw.vehicleDepreciationPct === undefined) {
+      p.vehicleDepreciationPct = Number(raw.appreciationPct);
+    }
+    if ((raw.assetType || p.assetType) !== "Veiculo" && raw.propertyAppreciationPct === undefined) {
+      p.propertyAppreciationPct = Number(raw.appreciationPct);
+    }
+  }
+
   p.propertyValue = Math.max(0, Number(p.propertyValue) || 0);
   p.reserve = Math.max(0, Number(p.reserve) || 0);
   p.monthlyCash = Math.max(0, Number(p.monthlyCash) || 0);
   p.insurance = Math.max(0, Number(p.insurance) || 0);
+  p.cardGrossCredit = Math.max(0, Number(p.cardGrossCredit) || 0);
+  p.cardRestrictions = Math.max(0, Number(p.cardRestrictions) || 0);
+  p.cardPrice = Math.max(0, Number(p.cardPrice) || 0);
+  p.cardTransferFee = Math.max(0, Number(p.cardTransferFee) || 0);
+  p.cardInstallment = Math.max(0, Number(p.cardInstallment) || 0);
 
   for (const key of percentFields) {
     p[key] = Math.max(0, Number(p[key]) || 0);
   }
+  p.vehicleDepreciationPct = clampNumber(Number(p.vehicleDepreciationPct), -0.999999, 10);
 
   for (const key of integerFields) {
     p[key] = Math.round(clampNumber(Number(p[key]) || defaultInputs[key], 1, MAX_MONTHS));
@@ -132,26 +200,82 @@ function normalizeInputs(raw) {
   p.directMonth = Math.round(clampNumber(p.directMonth, 1, Math.min(MAX_MONTHS, p.consMonths)));
   p.availabilityMonth = Math.round(clampNumber(p.availabilityMonth, 1, MAX_MONTHS));
   p.acquisitionFinMonth = 1;
+  p.cardPurchaseMonth = Math.round(clampNumber(p.cardPurchaseMonth, 1, MAX_MONTHS));
+  p.cardUseMonth = Math.round(clampNumber(p.cardUseMonth, 1, MAX_MONTHS));
+  p.cardRemainingMonths = Math.round(clampNumber(Number(p.cardRemainingMonths) || 0, 0, MAX_MONTHS));
 
   p.entryPct = clampNumber(p.entryPct, 0, 1);
   p.rentalDeductionsPct = clampNumber(p.rentalDeductionsPct, 0, 1);
   p.embeddedBidPct = clampNumber(p.embeddedBidPct, 0, 0.9);
   p.freeBidPct = clampNumber(p.freeBidPct, 0, 0.9);
   p.fixedBidPct = clampNumber(p.fixedBidPct, 0, 0.9);
-  p.usage = p.usage === "Moradia propria" ? "Moradia propria" : "Investimento para aluguel";
+  p.assetType = p.assetType === "Veiculo" ? "Veiculo" : "Imovel";
+  p.financingSystem = p.financingSystem === "PRICE" ? "PRICE" : "SAC";
+  const usageAliases = {
+    "Moradia propria": "Moradia",
+    "Uso proprio": "Moradia",
+    "Geracao de renda": "Investimento",
+    "Investimento para aluguel": "Investimento",
+    "Uso proprio sem aluguel": "Aquisicao",
+    "Apenas aquisicao": "Aquisicao",
+  };
+  p.usage = usageAliases[p.usage] || p.usage;
+  if (!["Moradia", "Investimento", "Aquisicao"].includes(p.usage)) {
+    p.usage = "Investimento";
+  }
 
   for (const key of booleanFields) {
     p[key] = Boolean(p[key]);
   }
+  if (p.useFixedBid && p.useFreeBid) {
+    p.useFreeBid = false;
+  }
+  const totalBidPct = p.useFixedBid ? p.fixedBidPct : p.useFreeBid ? p.freeBidPct : 0;
+  if (totalBidPct <= 0) {
+    p.useEmbeddedBid = false;
+    p.embeddedBidPct = 0;
+  } else {
+    p.embeddedBidPct = Math.min(p.embeddedBidPct, totalBidPct);
+  }
+  if (p.assetType === "Veiculo") {
+    p.usage = "Aquisicao";
+  }
 
+  p.selectedAssetRate = p.assetType === "Veiculo"
+    ? p.vehicleDepreciationPct
+    : p.propertyAppreciationPct;
   return p;
+}
+
+function parseR2Payload(hash) {
+  if (!hash || typeof hash !== "string") return null;
+  try {
+    const params = new URLSearchParams(hash.replace(/^#/, ""));
+    const rawPayload = params.get("r2");
+    if (!rawPayload) return null;
+    const payload = JSON.parse(rawPayload);
+    const inputs = payload && payload.inputs ? payload.inputs : payload;
+    if (!inputs || typeof inputs !== "object" || Array.isArray(inputs)) return null;
+    return {
+      source: payload.source || "avel-r2-vantagens-financeiras",
+      clientName: payload.clientName || "",
+      goalId: payload.goalId || "",
+      goalName: payload.goalName || "",
+      returnToken: payload.returnToken || "",
+      referenceStrategyId: payload.referenceStrategyId || "fin",
+      inputs: normalizeInputs(inputs),
+    };
+  } catch (error) {
+    return null;
+  }
 }
 
 function buildFinancingSchedule(p) {
   const interestMonthly = monthlyRate(p.annualInterest);
-  const trMonthly = monthlyRate(p.annualTR);
-  const entry = p.propertyValue * p.entryPct;
-  const financed = Math.max(0, p.propertyValue - entry);
+  const indexerMonthly = monthlyRate(p.annualTR);
+  const acquisitionPrice = p.propertyValue;
+  const entry = acquisitionPrice * p.entryPct;
+  const financed = Math.max(0, acquisitionPrice - entry);
   const rows = [];
   let balance = financed;
 
@@ -173,13 +297,20 @@ function buildFinancingSchedule(p) {
       continue;
     }
 
-    const correction = balance * trMonthly;
+    const correction = balance * indexerMonthly;
     const corrected = balance + correction;
     const remaining = Math.max(1, p.finMonths - month + 1);
-    const amortization = Math.min(corrected, corrected / remaining);
     const interest = corrected * interestMonthly;
+    const financialPayment = interestMonthly === 0
+      ? corrected / remaining
+      : corrected * interestMonthly / (1 - Math.pow(1 + interestMonthly, -remaining));
+    const amortization = p.financingSystem === "PRICE"
+      ? Math.max(0, Math.min(corrected, financialPayment - interest))
+      : Math.min(corrected, corrected / remaining);
     const insurance = p.insurance;
-    const payment = amortization + interest + insurance;
+    const payment = p.financingSystem === "PRICE"
+      ? financialPayment + insurance
+      : amortization + interest + insurance;
     const finalBalance = Math.max(0, corrected - amortization);
 
     rows.push({
@@ -202,9 +333,10 @@ function buildFinancingSchedule(p) {
 
 function buildAmortizationSchedule(p, financingRows) {
   const interestMonthly = monthlyRate(p.annualInterest);
-  const trMonthly = monthlyRate(p.annualTR);
-  const entry = p.propertyValue * p.entryPct;
-  const financed = Math.max(0, p.propertyValue - entry);
+  const indexerMonthly = monthlyRate(p.annualTR);
+  const acquisitionPrice = p.propertyValue;
+  const entry = acquisitionPrice * p.entryPct;
+  const financed = Math.max(0, acquisitionPrice - entry);
   const rows = [];
   let balance = financed;
   let payoffMonth = null;
@@ -223,7 +355,7 @@ function buildAmortizationSchedule(p, financingRows) {
       continue;
     }
 
-    const correction = balance * trMonthly;
+    const correction = balance * indexerMonthly;
     const corrected = balance + correction;
     const ordinaryAmort = Math.min(corrected, financingRows[month - 1]?.amortization || corrected);
     const interest = corrected * interestMonthly;
@@ -255,27 +387,47 @@ function buildAmortizationSchedule(p, financingRows) {
 function buildIqSchedule(p, financingRows) {
   const totalFees = p.consAdminPct + p.consReservePct + p.consInsurancePct;
   const factorAtContemplation = annualStepFactor(p.consAdjustPct, p.iqMonth);
-  const balanceAtContemplation = financingRows[p.iqMonth - 1]?.balance || 0;
+  const contemplationContractMonth = p.iqMonth - p.acquisitionFinMonth + 1;
+  const balanceAtContemplation = contemplationContractMonth > 0
+    ? financingRows[contemplationContractMonth - 1]?.balance || 0
+    : 0;
   const letterInitial = factorAtContemplation > 0 ? balanceAtContemplation / factorAtContemplation : 0;
   const creditUpdated = letterInitial * factorAtContemplation;
   const installmentInitial = p.consMonths > 0 ? (letterInitial * (1 + totalFees)) / p.consMonths : 0;
+  const returnMonthly = monthlyRate(p.annualReturn);
   const rows = [];
 
   for (let month = 1; month <= MAX_MONTHS; month += 1) {
     const factor = annualStepFactor(p.consAdjustPct, month);
     const consInstallment = month <= p.consMonths ? installmentInitial * factor : 0;
-    const finPayment = month <= p.iqMonth && month <= p.finMonths ? financingRows[month - 1]?.payment || 0 : 0;
+    const contractMonth = month - p.acquisitionFinMonth + 1;
+    const financingActive = contractMonth >= 1 && contractMonth <= p.finMonths && month <= p.iqMonth;
+    const finRow = financingActive ? financingRows[contractMonth - 1] : null;
+    const finPayment = finRow?.payment || 0;
+    const financingBalance = finRow?.balance || 0;
     const payment = consInstallment + finPayment;
-    const debt = month < p.iqMonth && month <= p.finMonths ? financingRows[month - 1]?.balance || 0 : 0;
 
     rows.push({
       month,
       consInstallment,
       finPayment,
       payment,
-      debt,
+      financingBalance,
     });
   }
+
+  addRemainingObligations(rows, "consInstallment", returnMonthly);
+  rows.forEach((row) => {
+    row.right = row.month < p.iqMonth
+      ? creditUpdated / Math.pow(1 + returnMonthly, p.iqMonth - row.month)
+      : 0;
+    const residualFinancing = row.month < p.iqMonth
+      ? row.financingBalance
+      : row.month === p.iqMonth
+        ? Math.max(0, row.financingBalance - creditUpdated)
+        : 0;
+    row.debt = residualFinancing + row.obligation;
+  });
 
   return {
     rows,
@@ -288,12 +440,13 @@ function buildIqSchedule(p, financingRows) {
 
 function buildDirectConsortiumSchedule(p) {
   const totalFees = p.consAdminPct + p.consReservePct + p.consInsurancePct;
-  const embedded = p.useEmbeddedBid ? p.embeddedBidPct : 0;
-  const freeFixed = (p.useFreeBid ? p.freeBidPct : 0) + (p.useFixedBid ? p.fixedBidPct : 0);
-  const clientBidPct = Math.max(0, freeFixed - embedded);
+  const acquisitionPrice = assetValueAtMonth(p, p.directMonth);
+  const totalBidPct = p.useFixedBid ? p.fixedBidPct : p.useFreeBid ? p.freeBidPct : 0;
+  const embedded = p.useEmbeddedBid ? Math.min(p.embeddedBidPct, totalBidPct) : 0;
+  const clientBidPct = Math.max(0, totalBidPct - embedded);
   const factorAtContemplation = annualStepFactor(p.consAdjustPct, p.directMonth);
   const denominator = Math.max(0.01, factorAtContemplation * (1 - embedded));
-  const letterInitial = p.propertyValue / denominator;
+  const letterInitial = acquisitionPrice / denominator;
   const grossCredit = letterInitial * factorAtContemplation;
   const netCredit = grossCredit * (1 - embedded);
   const clientBid = grossCredit * clientBidPct;
@@ -310,20 +463,86 @@ function buildDirectConsortiumSchedule(p) {
       installment,
       bid,
       payment: installment,
-      debt: 0,
     });
   }
 
+  const returnMonthly = monthlyRate(p.annualReturn);
+  addRemainingObligations(rows, "installment", returnMonthly);
+  rows.forEach((row) => {
+    row.right = row.month < p.directMonth
+      ? netCredit / Math.pow(1 + returnMonthly, p.directMonth - row.month)
+      : 0;
+    row.debt = row.obligation;
+  });
+
   return {
     rows,
+    acquisitionPrice,
     embedded,
-    freeFixed,
+    totalBidPct,
     clientBidPct,
     letterInitial,
     grossCredit,
     netCredit,
     clientBid,
     installmentInitial,
+  };
+}
+
+function buildContemplatedCardSchedule(p) {
+  const acquisitionMonth = Math.max(p.cardPurchaseMonth, p.cardUseMonth);
+  const acquisitionPrice = assetValueAtMonth(p, acquisitionMonth);
+  const netCredit = Math.max(0, p.cardGrossCredit - p.cardRestrictions);
+  const complement = Math.max(0, acquisitionPrice - netCredit);
+  const ignoredSurplus = Math.max(0, netCredit - acquisitionPrice);
+  const releasedSurplus = 0;
+  const initialCost = Math.max(0, p.cardPrice + p.cardTransferFee + complement);
+  const lastInstallmentMonth =
+    p.cardEnabled && p.cardRemainingMonths > 0
+      ? p.cardPurchaseMonth + p.cardRemainingMonths - 1
+      : 0;
+  const scheduleMonths = Math.max(MAX_MONTHS, lastInstallmentMonth);
+  const rows = [];
+
+  for (let month = 1; month <= scheduleMonths; month += 1) {
+    const inInstallmentWindow =
+      p.cardEnabled &&
+      month >= p.cardPurchaseMonth &&
+      month < p.cardPurchaseMonth + p.cardRemainingMonths;
+    const installmentFactor = month < p.cardPurchaseMonth
+      ? 1
+      : annualStepFactor(p.cardAdjustPct, month - p.cardPurchaseMonth + 1);
+    const installment = inInstallmentWindow ? p.cardInstallment * installmentFactor : 0;
+
+    rows.push({
+      month,
+      installment,
+      initialCost: p.cardEnabled && month === p.cardPurchaseMonth ? initialCost : 0,
+    });
+  }
+
+  const returnMonthly = monthlyRate(p.annualReturn);
+  addRemainingObligations(rows, "installment", returnMonthly);
+  rows.forEach((row) => {
+    row.debt = p.cardEnabled && row.month >= p.cardPurchaseMonth ? row.obligation : 0;
+  });
+
+  return {
+    rows,
+    acquisitionMonth,
+    acquisitionPrice,
+    netCredit,
+    complement,
+    ignoredSurplus,
+    releasedSurplus,
+    initialCost,
+    lastInstallmentMonth,
+    scheduleMonths,
+    economicCost:
+      p.cardPrice +
+      p.cardTransferFee +
+      rows.reduce((sum, row, index) => sum + row.installment / Math.pow(1 + returnMonthly, index + 1), 0) -
+      netCredit,
   };
 }
 
@@ -337,7 +556,7 @@ function buildSharedRows(p) {
     const rentStep = annualStepFactor(p.rentAdjustPct, month);
     const rentPaidBase = p.propertyValue * p.rentPaidPct * rentStep;
     const rentReceivedBase = p.propertyValue * p.rentReceivedPct * (1 - p.rentalDeductionsPct) * rentStep;
-    const propertyValueMonth = p.propertyValue * Math.pow(1 + p.appreciationPct, month / 12);
+    const propertyValueMonth = assetValueAtMonth(p, month);
     baseFv = month === 1 ? p.reserve + cashFree : baseFv * (1 + returnMonthly) + cashFree;
 
     rows.push({
@@ -360,48 +579,83 @@ function buildStrategyRows(p, sharedRows, schedules, strategyId) {
   let capitalVf = 0;
   let totalUncoveredDeficit = 0;
   let firstDeficitMonth = null;
-  const entry = p.propertyValue * p.entryPct;
+  const financingPrice = p.propertyValue;
+  const entry = financingPrice * p.entryPct;
   const finAvailability = Math.max(p.acquisitionFinMonth, p.availabilityMonth);
   const directAvailability = Math.max(p.directMonth, p.availabilityMonth);
+  const cardAvailability = Math.max(schedules.card.acquisitionMonth, p.availabilityMonth);
 
   for (let month = 1; month <= MAX_MONTHS; month += 1) {
     const shared = sharedRows[month - 1];
+    const contractMonth = month - p.acquisitionFinMonth + 1;
+    const contractIndex = contractMonth - 1;
     let entryOrBid = 0;
     let payment = 0;
     let debt = 0;
     let acquiredMonth = p.acquisitionFinMonth;
     let availability = finAvailability;
+    let economicRight = 0;
+    let strategyActive = true;
 
     if (strategyId === "fin") {
       entryOrBid = month === p.acquisitionFinMonth ? entry : 0;
-      payment = schedules.financing[month - 1]?.payment || 0;
-      debt = month <= p.finMonths ? schedules.financing[month - 1]?.balance || 0 : 0;
+      payment = contractMonth >= 1 && contractMonth <= p.finMonths
+        ? schedules.financing[contractIndex]?.payment || 0
+        : 0;
+      debt = contractMonth >= 1 && contractMonth <= p.finMonths
+        ? schedules.financing[contractIndex]?.balance || 0
+        : 0;
     }
 
     if (strategyId === "amort") {
       entryOrBid = month === p.acquisitionFinMonth ? entry : 0;
-      payment = schedules.amortization.rows[month - 1]?.payment || 0;
-      debt = month <= p.finMonths ? schedules.amortization.rows[month - 1]?.balance || 0 : 0;
+      payment = contractMonth >= 1 && contractMonth <= p.finMonths
+        ? schedules.amortization.rows[contractIndex]?.payment || 0
+        : 0;
+      debt = contractMonth >= 1 && contractMonth <= p.finMonths
+        ? schedules.amortization.rows[contractIndex]?.balance || 0
+        : 0;
     }
 
     if (strategyId === "iq") {
       entryOrBid = month === p.acquisitionFinMonth ? entry : 0;
       payment = schedules.iq.rows[month - 1]?.payment || 0;
       debt = schedules.iq.rows[month - 1]?.debt || 0;
+      economicRight = schedules.iq.rows[month - 1]?.right || 0;
     }
 
     if (strategyId === "cons") {
       entryOrBid = month === p.directMonth ? schedules.direct.clientBid : 0;
       payment = schedules.direct.rows[month - 1]?.payment || 0;
-      debt = 0;
+      debt = schedules.direct.rows[month - 1]?.debt || 0;
+      economicRight = schedules.direct.rows[month - 1]?.right || 0;
       acquiredMonth = p.directMonth;
       availability = directAvailability;
     }
 
+    if (strategyId === "card") {
+      strategyActive = p.cardEnabled;
+      entryOrBid = schedules.card.rows[month - 1]?.initialCost || 0;
+      payment = schedules.card.rows[month - 1]?.installment || 0;
+      debt = schedules.card.rows[month - 1]?.debt || 0;
+      acquiredMonth = schedules.card.acquisitionMonth;
+      availability = cardAvailability;
+    }
+
     const rentPaid =
-      p.usage === "Moradia propria" && month < availability ? shared.rentPaidBase : 0;
+      strategyActive &&
+      p.assetType === "Imovel" &&
+      p.usage === "Moradia" &&
+      month < availability
+        ? shared.rentPaidBase
+        : 0;
     const rentReceived =
-      p.usage === "Investimento para aluguel" && month >= availability ? shared.rentReceivedBase : 0;
+      strategyActive &&
+      p.assetType === "Imovel" &&
+      p.usage === "Investimento" &&
+      month >= availability
+        ? shared.rentReceivedBase
+        : 0;
     const outputs = entryOrBid + payment + rentPaid;
     const inputs = rentReceived;
     const freeFlow = shared.cashFree + inputs - outputs;
@@ -414,9 +668,10 @@ function buildStrategyRows(p, sharedRows, schedules, strategyId) {
     capitalVf = month === 1 ? capitalMonth : capitalVf * (1 + returnMonthly) + capitalMonth;
     invested = Math.max(0, beforeAdjustment);
 
-    const property = month >= acquiredMonth ? shared.propertyValueMonth : 0;
-    const grossWorth = invested + property - debt;
-    const adjustedWorth = grossWorth - capitalVf;
+    const property = strategyActive && month >= acquiredMonth ? shared.propertyValueMonth : 0;
+    const assetPosition = property + economicRight;
+    const grossWorth = invested + assetPosition - debt;
+    const adjustedWorth = grossWorth;
 
     rows.push({
       month,
@@ -431,7 +686,7 @@ function buildStrategyRows(p, sharedRows, schedules, strategyId) {
       capitalMonth,
       capitalVf,
       debt,
-      property,
+      property: assetPosition,
       grossWorth,
       adjustedWorth,
       firstDeficitMonth,
@@ -463,6 +718,11 @@ function getInitialPaymentLines(id, schedules) {
     ];
   }
 
+  if (id === "card") {
+    const firstInstallment = schedules.card.rows.find((row) => row.installment > 0)?.installment || 0;
+    return [{ label: "Carta contemplada", value: firstInstallment }];
+  }
+
   return [{ label: "Consórcio", value: schedules.direct.installmentInitial || 0 }];
 }
 
@@ -478,20 +738,32 @@ function summarizeStrategy(p, sharedRows, strategyRows, schedules, id) {
   const baseFv = sharedRows[horizon - 1].baseFv;
   const gapFv = final.adjustedWorth - baseFv;
   const entry = p.propertyValue * p.entryPct;
-  const isViable = final.capitalVf <= 1;
+  const isEnabled = id !== "card" || p.cardEnabled;
+  const isViable = isEnabled && final.capitalVf <= 1;
 
-  const acquisitionMonth = id === "cons" ? p.directMonth : p.acquisitionFinMonth;
+  const acquisitionMonth =
+    id === "cons"
+      ? p.directMonth
+      : id === "card"
+        ? schedules.card.acquisitionMonth
+        : p.acquisitionFinMonth;
   const payoffMonth =
     id === "fin"
-      ? p.finMonths
+      ? p.acquisitionFinMonth + p.finMonths - 1
       : id === "amort"
-        ? schedules.amortization.payoffMonth
+        ? p.acquisitionFinMonth + schedules.amortization.payoffMonth - 1
         : id === "iq"
-          ? p.iqMonth
-          : p.directMonth;
+          ? p.consMonths
+          : id === "cons"
+            ? p.consMonths
+            : p.cardPurchaseMonth + p.cardRemainingMonths - 1;
 
   const entryOrInitial =
-    id === "cons" ? schedules.direct.clientBid : entry;
+    id === "cons"
+      ? schedules.direct.clientBid
+      : id === "card"
+        ? schedules.card.initialCost
+        : entry;
 
   return {
     id,
@@ -514,6 +786,7 @@ function summarizeStrategy(p, sharedRows, strategyRows, schedules, id) {
     adjustedWorth: final.adjustedWorth,
     adjustedToday: final.adjustedWorth / inflationFactor,
     gapFv,
+    vplVsBase: gapFv / Math.pow(1 + monthlyRate(p.annualReturn), horizon),
     invested: final.invested,
     debt: final.debt,
     rows: strategyRows,
@@ -526,10 +799,11 @@ function calculateScenario(rawInputs) {
   const amortization = buildAmortizationSchedule(p, financing);
   const iq = buildIqSchedule(p, financing);
   const direct = buildDirectConsortiumSchedule(p);
+  const card = buildContemplatedCardSchedule(p);
   const sharedRows = buildSharedRows(p);
-  const schedules = { financing, amortization, iq, direct };
+  const schedules = { financing, amortization, iq, direct, card };
 
-  const strategies = ["fin", "amort", "iq", "cons"].map((id) => {
+  const strategies = ["fin", "amort", "iq", "cons", "card"].map((id) => {
     const rows = buildStrategyRows(p, sharedRows, schedules, id);
     return summarizeStrategy(p, sharedRows, rows, schedules, id);
   });
@@ -538,7 +812,8 @@ function calculateScenario(rawInputs) {
   const sorted = [...viableStrategies].sort((a, b) => b.adjustedToday - a.adjustedToday);
   const best = sorted[0] || null;
   const second = sorted[1] || null;
-  const entry = p.propertyValue * p.entryPct;
+  const financingPrice = p.propertyValue;
+  const entry = financingPrice * p.entryPct;
   const totalFees = p.consAdminPct + p.consReservePct + p.consInsurancePct;
 
   return {
@@ -551,15 +826,77 @@ function calculateScenario(rawInputs) {
     second,
     derived: {
       entry,
-      financed: Math.max(0, p.propertyValue - entry),
+      financingPrice,
+      financed: Math.max(0, financingPrice - entry),
       monthlyInterest: monthlyRate(p.annualInterest),
+      monthlyIndexer: monthlyRate(p.annualTR),
       monthlyTR: monthlyRate(p.annualTR),
       monthlyReturn: monthlyRate(p.annualReturn),
       totalConsortiumFees: totalFees,
       rentPaidInitial: p.propertyValue * p.rentPaidPct,
       rentReceivedInitial: p.propertyValue * p.rentReceivedPct * (1 - p.rentalDeductionsPct),
+      selectedAssetRate: p.selectedAssetRate,
+      directAcquisitionPrice: direct.acquisitionPrice,
+      cardAcquisitionPrice: card.acquisitionPrice,
       baseFv: sharedRows[p.horizonMonths - 1].baseFv,
     },
+  };
+}
+
+function summarizeR2Strategy(strategy) {
+  if (!strategy) return null;
+  return {
+    id: strategy.id,
+    name: strategy.name,
+    acquisitionMonth: strategy.acquisitionMonth,
+    payoffMonth: strategy.payoffMonth,
+    entryOrInitial: strategy.entryOrInitial,
+    initialPaymentLines: strategy.initialPaymentLines,
+    totalOutputs: strategy.totalOutputs,
+    totalInputs: strategy.totalInputs,
+    netFlow: strategy.netFlow,
+    isViable: strategy.isViable,
+    firstDeficitMonth: strategy.firstDeficitMonth,
+    totalUncoveredDeficit: strategy.totalUncoveredDeficit,
+    adjustedToday: strategy.adjustedToday,
+    gapFv: strategy.gapFv,
+    vplVsBase: strategy.vplVsBase,
+    debt: strategy.debt,
+  };
+}
+
+function buildR2AcquisitionAnalysis(result, options = {}) {
+  const best = result.best || null;
+  const requestedReferenceId = options.referenceStrategyId || "fin";
+  const requestedReference = result.strategies.find((strategy) => strategy.id === requestedReferenceId) || null;
+  let reference = requestedReference && requestedReference.isViable ? requestedReference : null;
+  let referenceFallback = false;
+
+  if (!reference && best) {
+    reference = result.viableStrategies.find((strategy) => strategy.id !== best.id) || null;
+    referenceFallback = Boolean(reference);
+  }
+
+  const advantage = best && reference
+    ? Math.max(0, best.adjustedToday - reference.adjustedToday)
+    : null;
+
+  return {
+    status: options.status || "reviewed",
+    source: "calculadora-aquisicao",
+    calculatedAt: new Date().toISOString(),
+    goalId: options.goalId || "",
+    goalName: options.goalName || "",
+    basis: "patrimonio_acumulado_valor_presente",
+    horizonMonths: result.inputs.horizonMonths,
+    inputs: result.inputs,
+    requestedReferenceStrategyId: requestedReferenceId,
+    referenceFallback,
+    viableCount: result.viableStrategies.length,
+    bestStrategy: summarizeR2Strategy(best),
+    referenceStrategy: summarizeR2Strategy(reference),
+    advantagePresentValue: advantage,
+    strategies: result.strategies.map(summarizeR2Strategy),
   };
 }
 
@@ -660,9 +997,58 @@ function getDomState() {
     const key = element.dataset.field;
     state[key] = parseInputValue(key, element);
   });
-  const activeUsage = document.querySelector('[data-segment="usage"].is-active');
-  if (activeUsage) state.usage = activeUsage.dataset.value;
+  document.querySelectorAll("[data-segment].is-active").forEach((button) => {
+    state[button.dataset.segment] = button.dataset.value;
+  });
   return state;
+}
+
+function updateConditionalFields(state) {
+  const normalized = normalizeInputs(state);
+  document.querySelectorAll("[data-asset-only]").forEach((element) => {
+    element.hidden = element.dataset.assetOnly !== normalized.assetType;
+  });
+  document.querySelectorAll("[data-real-estate-only]").forEach((element) => {
+    element.hidden = normalized.assetType !== "Imovel";
+  });
+  document.querySelectorAll("[data-purpose-only]").forEach((element) => {
+    element.hidden =
+      normalized.assetType !== "Imovel" ||
+      element.dataset.purposeOnly !== normalized.usage;
+  });
+  document.querySelectorAll("[data-bid-only]").forEach((element) => {
+    const active = element.dataset.bidOnly === "fixed"
+      ? normalized.useFixedBid
+      : normalized.useFreeBid;
+    element.hidden = !active;
+  });
+  document.querySelectorAll("[data-embedded-only]").forEach((element) => {
+    element.hidden = !normalized.useEmbeddedBid;
+  });
+}
+
+function synchronizeBidControls(changedKey) {
+  const fixed = document.querySelector('[data-field="useFixedBid"]');
+  const free = document.querySelector('[data-field="useFreeBid"]');
+  const embedded = document.querySelector('[data-field="useEmbeddedBid"]');
+  if (!fixed || !free || !embedded) return;
+
+  if (changedKey === "useFixedBid" && fixed.checked) free.checked = false;
+  if (changedKey === "useFreeBid" && free.checked) fixed.checked = false;
+  if (!fixed.checked && !free.checked) embedded.checked = false;
+
+  const totalField = fixed.checked
+    ? document.querySelector('[data-field="fixedBidPct"]')
+    : free.checked
+      ? document.querySelector('[data-field="freeBidPct"]')
+      : null;
+  const embeddedField = document.querySelector('[data-field="embeddedBidPct"]');
+  if (embedded.checked && totalField && embeddedField) {
+    embeddedField.max = totalField.value || "0";
+    if (Number(embeddedField.value) > Number(totalField.value)) {
+      embeddedField.value = totalField.value;
+    }
+  }
 }
 
 function setDomState(state) {
@@ -676,9 +1062,11 @@ function setDomState(state) {
     }
   });
 
-  document.querySelectorAll('[data-segment="usage"]').forEach((button) => {
-    button.classList.toggle("is-active", button.dataset.value === normalized.usage);
+  document.querySelectorAll("[data-segment]").forEach((button) => {
+    const key = button.dataset.segment;
+    button.classList.toggle("is-active", button.dataset.value === normalized[key]);
   });
+  updateConditionalFields(normalized);
 }
 
 function renderHero(result) {
@@ -940,15 +1328,15 @@ function renderComparisonRows(result) {
 function renderAssumptions(result) {
   const p = result.inputs;
   const items = [
-    ["Imóvel", formatCurrency(p.propertyValue)],
+    [p.assetType === "Veiculo" ? "Veículo" : "Imóvel", formatCurrency(p.propertyValue)],
     ["Reserva", formatCurrency(p.reserve)],
     ["Caixa mensal", formatCurrency(p.monthlyCash)],
     ["Horizonte", `${p.horizonMonths} meses`],
-    ["Financiamento", `${p.finMonths} meses a ${formatPercent(p.annualInterest)}`],
+    ["Financiamento", `${p.financingSystem}, ${p.finMonths} meses a ${formatPercent(p.annualInterest)}`],
     ["Consórcio", `${p.consMonths} meses, reajuste ${formatPercent(p.consAdjustPct)}`],
-    ["Uso", p.usage === "Moradia propria" ? "Moradia" : "Investimento"],
     ["Rentabilidade", formatPercent(p.annualReturn)],
   ];
+  if (p.assetType === "Imovel") items.splice(6, 0, ["Finalidade", p.usage]);
 
   const container = document.getElementById("assumptionChips");
   container.innerHTML = "";
@@ -972,13 +1360,15 @@ function renderProposal(result) {
   document.getElementById("proposalConclusion").textContent = conclusion;
 
   const assumptions = [
-    `Valor do imóvel: ${formatCurrency(p.propertyValue)}.`,
+    `Tipo e valor do bem: ${p.assetType === "Veiculo" ? "veículo" : "imóvel"} de ${formatCurrency(p.propertyValue)}.`,
     `Entrada do financiamento: ${formatPercent(p.entryPct)} (${formatCurrency(result.derived.entry)}).`,
+    `Sistema de financiamento: ${p.financingSystem}; indexador anual de ${formatPercent(p.annualTR)}.`,
+    "Preço de aquisição: financiamento pelo valor atual no mês 1; consórcios pelo valor futuro no mês de uso do crédito.",
     `Caixa livre mensal considerado: ${formatCurrency(p.monthlyCash)}.`,
     `Horizonte comparativo: ${p.horizonMonths} meses.`,
     `Rentabilidade líquida anual: ${formatPercent(p.annualReturn)}.`,
-    `Finalidade do imóvel: ${p.usage === "Moradia propria" ? "moradia própria" : "investimento para aluguel"}.`,
   ];
+  if (p.assetType === "Imovel") assumptions.push(`Finalidade do imóvel: ${p.usage.toLowerCase()}.`);
   const list = document.getElementById("proposalAssumptions");
   list.innerHTML = "";
   assumptions.forEach((text) => {
@@ -1012,19 +1402,23 @@ function getAlternativeDescription(result, strategy) {
   const entry = result.derived.entry;
 
   if (strategy.id === "fin") {
-    return `Financiamento de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)}, sem amortização extraordinária até o final do prazo de ${p.finMonths} meses.`;
+    return `Financiamento ${p.financingSystem} de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)}, sem amortização extraordinária até o final do prazo de ${p.finMonths} meses.`;
   }
 
   if (strategy.id === "amort") {
-    return `Financiamento de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)} e amortização mensal usando a disponibilidade de caixa prevista até a quitação.`;
+    return `Financiamento ${p.financingSystem} de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)} e amortização mensal usando a disponibilidade de caixa prevista até a quitação.`;
   }
 
   if (strategy.id === "iq") {
-    return `Financiamento de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)}, combinado com consórcio de aproximadamente ${formatCurrency(result.schedules.iq.creditUpdated)} para atuar como interveniente quitante a partir do mês ${p.iqMonth}. Carta inicial estimada de ${formatCurrency(result.schedules.iq.letterInitial)}, prazo de ${p.consMonths} meses e reajuste anual de ${formatPercent(p.consAdjustPct)}.`;
+    return `Financiamento ${p.financingSystem} de ${formatCurrency(financed)}, combinado com consórcio de aproximadamente ${formatCurrency(result.schedules.iq.creditUpdated)} no mês ${p.iqMonth}. O patrimônio desconta o VP das parcelas futuras até o mês ${p.consMonths}.`;
+  }
+
+  if (strategy.id === "card") {
+    return `Carta contemplada com crédito líquido de ${formatCurrency(result.schedules.card.netCredit)}, preço de compra de ${formatCurrency(p.cardPrice)}, taxa de transferência de ${formatCurrency(p.cardTransferFee)} e ${p.cardRemainingMonths} parcelas restantes.`;
   }
 
   const bidParts = [];
-  if (p.useEmbeddedBid) bidParts.push(`lance embutido de ${formatPercent(p.embeddedBidPct)}`);
+  if (p.useEmbeddedBid) bidParts.push(`lance embutido de ${formatPercent(result.schedules.direct.embedded)}`);
   if (p.useFreeBid) bidParts.push(`lance livre de ${formatPercent(p.freeBidPct)}`);
   if (p.useFixedBid) bidParts.push(`lance fixo de ${formatPercent(p.fixedBidPct)}`);
   const bidText = bidParts.length ? `, com ${bidParts.join(" e ")}` : "";
@@ -1032,7 +1426,7 @@ function getAlternativeDescription(result, strategy) {
     ? ` Lance adicional de recursos próprios estimado em ${formatCurrency(result.schedules.direct.clientBid)}.`
     : " Sem lance adicional de recursos próprios no cenário base.";
 
-  return `Consórcio para aquisição de ${formatCurrency(p.propertyValue)}, com carta bruta estimada de ${formatCurrency(result.schedules.direct.grossCredit)}${bidText}, contemplação simulada no mês ${p.directMonth}.${clientBidText}`;
+  return `Consórcio direto para preço de aquisição de ${formatCurrency(result.schedules.direct.acquisitionPrice)}, com carta bruta estimada de ${formatCurrency(result.schedules.direct.grossCredit)}${bidText}, contemplação simulada no mês ${p.directMonth}.${clientBidText}`;
 }
 
 function renderPrintAlternativeCards(result) {
@@ -1084,15 +1478,16 @@ function renderPrintBarRows(result, valueKey) {
 function renderPrintAssumptions(result) {
   const p = result.inputs;
   const items = [
-    ["Imóvel", formatCurrency(p.propertyValue)],
+    [p.assetType === "Veiculo" ? "Veículo" : "Imóvel", formatCurrency(p.propertyValue)],
     ["Reserva", formatCurrency(p.reserve)],
     ["Caixa mensal", formatCurrency(p.monthlyCash)],
     ["Horizonte", `${p.horizonMonths} meses`],
-    ["Finalidade", p.usage === "Moradia propria" ? "Moradia" : "Investimento para aluguel"],
+    ["Sistema", p.financingSystem],
     ["Rentabilidade", formatPercent(p.annualReturn)],
-    ["Valorização", formatPercent(p.appreciationPct)],
+    ["Taxa do bem", formatPercent(p.selectedAssetRate)],
     ["Inflação", formatPercent(p.inflationPct)],
   ];
+  if (p.assetType === "Imovel") items.splice(4, 0, ["Finalidade", p.usage]);
 
   return items
     .map(([label, value]) => printMetric(label, escapeHtml(value)))
@@ -1156,7 +1551,7 @@ function renderPrintReport(result) {
         <b></b>
       </header>
       <h1>Alternativas analisadas</h1>
-      <p class="print-lead">Quatro caminhos foram analisados para a aquisição do imóvel. Cada alternativa abaixo considera as mesmas premissas de valor, prazo, caixa disponível e rentabilidade.</p>
+      <p class="print-lead">Cinco caminhos foram analisados para a aquisição do bem. Cada alternativa usa as mesmas premissas de valor, prazo, caixa, preço de aquisição e rentabilidade.</p>
       <div class="print-alt-list">
         ${renderPrintAlternativeCards(result)}
       </div>
@@ -1223,12 +1618,22 @@ function update() {
 }
 
 function init() {
-  setDomState(defaultInputs);
-  render(calculateScenario(defaultInputs));
+  const importedScenario = parseR2Payload(window.location.hash);
+  const startupInputs = importedScenario ? importedScenario.inputs : defaultInputs;
+  setDomState(startupInputs);
+  render(calculateScenario(startupInputs));
 
   document.querySelectorAll("[data-field]").forEach((element) => {
-    element.addEventListener("input", update);
-    element.addEventListener("change", update);
+    element.addEventListener("input", () => {
+      synchronizeBidControls(element.dataset.field);
+      updateConditionalFields(getDomState());
+      update();
+    });
+    element.addEventListener("change", () => {
+      synchronizeBidControls(element.dataset.field);
+      updateConditionalFields(getDomState());
+      update();
+    });
     if (currencyFields.has(element.dataset.field)) {
       element.addEventListener("blur", () => {
         const key = element.dataset.field;
@@ -1238,17 +1643,24 @@ function init() {
     }
   });
 
-  document.querySelectorAll('[data-segment="usage"]').forEach((button) => {
+  document.querySelectorAll("[data-segment]").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll('[data-segment="usage"]').forEach((item) => item.classList.remove("is-active"));
+      document
+        .querySelectorAll(`[data-segment="${button.dataset.segment}"]`)
+        .forEach((item) => item.classList.remove("is-active"));
       button.classList.add("is-active");
+      if (button.dataset.segment === "financingSystem" && button.dataset.value === "PRICE") {
+        const indexer = document.querySelector('[data-field="annualTR"]');
+        if (indexer) indexer.value = 0;
+      }
+      updateConditionalFields(getDomState());
       update();
     });
   });
 
   document.getElementById("resetButton").addEventListener("click", () => {
-    setDomState(defaultInputs);
-    render(calculateScenario(defaultInputs));
+    setDomState(startupInputs);
+    render(calculateScenario(startupInputs));
   });
 
   const manualButton = document.getElementById("manualButton");
@@ -1267,6 +1679,28 @@ function init() {
 
   document.getElementById("printButton").addEventListener("click", () => window.print());
 
+  const applyR2Button = document.getElementById("applyR2Button");
+  if (importedScenario && importedScenario.returnToken && window.opener) {
+    applyR2Button.hidden = false;
+    applyR2Button.addEventListener("click", () => {
+      const result = calculateScenario(getDomState());
+      const analysis = buildR2AcquisitionAnalysis(result, {
+        status: "reviewed",
+        goalId: importedScenario.goalId,
+        goalName: importedScenario.goalName,
+        referenceStrategyId: importedScenario.referenceStrategyId,
+      });
+      window.opener.postMessage({
+        type: "avel-r2-acquisition-result",
+        returnToken: importedScenario.returnToken,
+        goalId: importedScenario.goalId,
+        analysis,
+      }, "*");
+      applyR2Button.querySelector("span").textContent = "Aplicado à R2";
+      applyR2Button.classList.add("is-applied");
+    });
+  }
+
   if (window.lucide) {
     window.lucide.createIcons();
   } else {
@@ -1282,10 +1716,13 @@ if (typeof module !== "undefined") {
   module.exports = {
     defaultInputs,
     normalizeInputs,
+    parseR2Payload,
     calculateScenario,
+    buildR2AcquisitionAnalysis,
     buildFinancingSchedule,
     buildAmortizationSchedule,
     buildIqSchedule,
     buildDirectConsortiumSchedule,
+    buildContemplatedCardSchedule,
   };
 }

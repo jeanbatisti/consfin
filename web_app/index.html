@@ -6,7 +6,7 @@
     <title>Ável | Calculadora de Aquisição</title>
     <meta
       name="description"
-      content="Interface consultiva para comparar financiamento, amortização, consórcio IQ e consórcio."
+      content="Interface consultiva para comparar cinco estratégias de aquisição de imóvel ou veículo."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -38,6 +38,10 @@
           <i data-lucide="book-open" aria-hidden="true"></i>
           <span>Manual</span>
         </button>
+        <button class="icon-button accent" type="button" id="applyR2Button" title="Aplicar resultado na R2" hidden>
+          <i data-lucide="check-circle-2" aria-hidden="true"></i>
+          <span>Aplicar na R2</span>
+        </button>
         <button class="icon-button accent" type="button" id="printButton" title="Gerar PDF">
           <i data-lucide="printer" aria-hidden="true"></i>
           <span>Gerar PDF</span>
@@ -53,21 +57,32 @@
         </div>
 
         <section class="input-section">
-          <h3>Finalidade</h3>
-          <div class="segmented" role="group" aria-label="Uso do imóvel">
-            <button type="button" data-segment="usage" data-value="Investimento para aluguel">
-              Investimento
+          <h3>Tipo do bem</h3>
+          <div class="segmented" role="group" aria-label="Tipo do bem">
+            <button type="button" data-segment="assetType" data-value="Imovel">
+              Imóvel
             </button>
-            <button type="button" data-segment="usage" data-value="Moradia propria">
+            <button type="button" data-segment="assetType" data-value="Veiculo">
+              Veículo
+            </button>
+          </div>
+          <div data-real-estate-only>
+          <h3>Finalidade do imóvel</h3>
+          <div class="segmented" role="group" aria-label="Finalidade do imóvel">
+            <button type="button" data-segment="usage" data-value="Moradia">
               Moradia
             </button>
+            <button type="button" data-segment="usage" data-value="Investimento">
+              Investimento
+            </button>
+          </div>
           </div>
         </section>
 
         <section class="input-section">
-          <h3>Imóvel e caixa</h3>
+          <h3>Bem e caixa</h3>
           <label>
-            <span>Valor do imóvel novo</span>
+            <span>Valor atual do bem</span>
             <input data-field="propertyValue" type="text" inputmode="decimal" autocomplete="off" />
           </label>
           <label>
@@ -87,6 +102,13 @@
         <details open>
           <summary>Financiamento</summary>
           <div class="input-section compact">
+            <div class="field-span">
+              <span class="field-label">Sistema</span>
+              <div class="segmented" role="group" aria-label="Sistema de financiamento">
+                <button type="button" data-segment="financingSystem" data-value="SAC">SAC</button>
+                <button type="button" data-segment="financingSystem" data-value="PRICE">PRICE</button>
+              </div>
+            </div>
             <label>
               <span>Entrada (%)</span>
               <input data-field="entryPct" type="number" min="0" max="100" step="1" />
@@ -100,7 +122,7 @@
               <input data-field="annualInterest" type="number" min="0" step="0.1" />
             </label>
             <label>
-              <span>TR a.a. (%)</span>
+              <span>Indexador/correção a.a. (%)</span>
               <input data-field="annualTR" type="number" min="0" step="0.1" />
             </label>
             <label>
@@ -138,7 +160,7 @@
               <input data-field="iqMonth" type="number" min="1" max="480" step="1" />
             </label>
             <label>
-              <span>Mês consórcio</span>
+              <span>Mês consórcio direto</span>
               <input data-field="directMonth" type="number" min="1" max="480" step="1" />
             </label>
           </div>
@@ -151,7 +173,7 @@
               <input data-field="useEmbeddedBid" type="checkbox" />
               <span>Usar lance embutido</span>
             </label>
-            <label>
+            <label data-embedded-only>
               <span>Lance embutido (%)</span>
               <input data-field="embeddedBidPct" type="number" min="0" max="90" step="1" />
             </label>
@@ -159,7 +181,7 @@
               <input data-field="useFreeBid" type="checkbox" />
               <span>Usar lance livre</span>
             </label>
-            <label>
+            <label data-bid-only="free">
               <span>Lance livre (%)</span>
               <input data-field="freeBidPct" type="number" min="0" max="90" step="1" />
             </label>
@@ -167,7 +189,7 @@
               <input data-field="useFixedBid" type="checkbox" />
               <span>Usar lance fixo</span>
             </label>
-            <label>
+            <label data-bid-only="fixed">
               <span>Lance fixo (%)</span>
               <input data-field="fixedBidPct" type="number" min="0" max="90" step="1" />
             </label>
@@ -175,35 +197,85 @@
         </details>
 
         <details>
-          <summary>Aluguel e economia</summary>
+          <summary>Carta contemplada</summary>
           <div class="input-section compact">
+            <label class="check-row">
+              <input data-field="cardEnabled" type="checkbox" />
+              <span>Comparar carta contemplada</span>
+            </label>
             <label>
-              <span>Entrega/chaves (mês)</span>
+              <span>Mês de compra/transferência</span>
+              <input data-field="cardPurchaseMonth" type="number" min="1" max="480" step="1" />
+            </label>
+            <label>
+              <span>Mês de uso do crédito</span>
+              <input data-field="cardUseMonth" type="number" min="1" max="480" step="1" />
+            </label>
+            <label>
+              <span>Crédito bruto</span>
+              <input data-field="cardGrossCredit" type="text" inputmode="decimal" autocomplete="off" />
+            </label>
+            <label>
+              <span>Restrições do crédito</span>
+              <input data-field="cardRestrictions" type="text" inputmode="decimal" autocomplete="off" />
+            </label>
+            <label>
+              <span>Preço pago pela carta</span>
+              <input data-field="cardPrice" type="text" inputmode="decimal" autocomplete="off" />
+            </label>
+            <label>
+              <span>Taxa de transferência</span>
+              <input data-field="cardTransferFee" type="text" inputmode="decimal" autocomplete="off" />
+            </label>
+            <label>
+              <span>Parcelas restantes</span>
+              <input data-field="cardRemainingMonths" type="number" min="0" max="480" step="1" />
+            </label>
+            <label>
+              <span>Parcela atual</span>
+              <input data-field="cardInstallment" type="text" inputmode="decimal" autocomplete="off" />
+            </label>
+            <label>
+              <span>Reajuste anual (%)</span>
+              <input data-field="cardAdjustPct" type="number" min="0" step="0.5" />
+            </label>
+          </div>
+        </details>
+
+        <details>
+          <summary>Uso, renda e economia</summary>
+          <div class="input-section compact">
+            <label data-real-estate-only>
+              <span>Disponibilidade/uso (mês)</span>
               <input data-field="availabilityMonth" type="number" min="1" max="480" step="1" />
             </label>
-            <label>
-              <span>Aluguel pago a.m. (%)</span>
+            <label data-purpose-only="Moradia">
+              <span>Custo de espera a.m. (%)</span>
               <input data-field="rentPaidPct" type="number" min="0" step="0.05" />
             </label>
-            <label>
-              <span>Aluguel bruto a.m. (%)</span>
+            <label data-purpose-only="Investimento">
+              <span>Receita bruta a.m. (%)</span>
               <input data-field="rentReceivedPct" type="number" min="0" step="0.05" />
             </label>
-            <label>
-              <span>Reajuste aluguel a.a. (%)</span>
+            <label data-real-estate-only>
+              <span>Reajuste espera/renda a.a. (%)</span>
               <input data-field="rentAdjustPct" type="number" min="0" step="0.5" />
             </label>
-            <label>
-              <span>Redutores do aluguel (%)</span>
+            <label data-purpose-only="Investimento">
+              <span>Redutores da renda (%)</span>
               <input data-field="rentalDeductionsPct" type="number" min="0" max="100" step="1" />
             </label>
             <label>
               <span>Rentabilidade líquida a.a. (%)</span>
               <input data-field="annualReturn" type="number" min="0" step="0.5" />
             </label>
-            <label>
-              <span>Valorização imóvel a.a. (%)</span>
-              <input data-field="appreciationPct" type="number" min="0" step="0.5" />
+            <label data-asset-only="Imovel">
+              <span>Valorização do imóvel a.a. (%)</span>
+              <input data-field="propertyAppreciationPct" type="number" step="0.5" />
+            </label>
+            <label data-asset-only="Veiculo">
+              <span>Depreciação do veículo a.a. (%)</span>
+              <input data-field="vehicleDepreciationPct" type="number" min="-99.9" step="0.5" />
             </label>
             <label>
               <span>Inflação esperada a.a. (%)</span>
@@ -336,10 +408,10 @@
             <a href="#manual-finalidade">Finalidade</a>
             <a href="#manual-fluxo">Fluxo recomendado</a>
             <a href="#manual-navegacao">Navegação e botões</a>
-            <a href="#manual-imovel">Imóvel e caixa</a>
+            <a href="#manual-imovel">Bem e caixa</a>
             <a href="#manual-financiamento">Financiamento</a>
             <a href="#manual-consorcio">Consórcio e lances</a>
-            <a href="#manual-economia">Aluguel e economia</a>
+            <a href="#manual-economia">Uso, renda e economia</a>
             <a href="#manual-alternativas">Alternativas</a>
             <a href="#manual-resultados">Leitura dos resultados</a>
             <a href="#manual-pdf">Geração do PDF</a>
@@ -352,14 +424,15 @@
             <section id="manual-finalidade">
               <span class="manual-section-number">01</span>
               <h2>Finalidade da interface</h2>
-              <p>A interface compara quatro alternativas para a mesma pessoa adquirir um imóvel:</p>
+              <p>A interface compara cinco alternativas para adquirir um imóvel ou veículo:</p>
               <ol>
                 <li>Financiamento sem amortização extraordinária.</li>
                 <li>Financiamento com amortização usando a disponibilidade mensal.</li>
                 <li>Financiamento combinado com consórcio como interveniente quitante (IQ).</li>
-                <li>Consórcio.</li>
+                <li>Consórcio direto.</li>
+                <li>Compra de carta contemplada.</li>
               </ol>
-              <p>As alternativas usam as mesmas premissas de imóvel, reserva, caixa mensal, horizonte, aluguel, rentabilidade, valorização e inflação. A estratégia indicada é a que apresenta o maior Patrimônio Acumulado entre as alternativas financeiramente viáveis.</p>
+              <p>As alternativas usam as mesmas premissas de bem, reserva, caixa mensal, horizonte, preço de aquisição e rentabilidade. A indicação considera apenas estratégias financeiramente viáveis.</p>
               <div class="manual-note">A simulação é indicativa e não substitui análise de crédito, proposta bancária, regulamento do consórcio, contrato, avaliação tributária ou parecer jurídico.</div>
             </section>
 
@@ -367,13 +440,13 @@
               <span class="manual-section-number">02</span>
               <h2>Fluxo recomendado de uso</h2>
               <ol class="manual-steps">
-                <li>Escolha a finalidade: Investimento ou Moradia.</li>
-                <li>Informe o valor do imóvel, a reserva e o caixa livre mensal.</li>
+                <li>Escolha Imóvel ou Veículo e, para imóvel, a finalidade.</li>
+                <li>Informe o valor do bem, a reserva e o caixa livre mensal.</li>
                 <li>Defina o horizonte da comparação.</li>
-                <li>Revise as premissas do financiamento.</li>
+                <li>Escolha SAC ou PRICE e revise as premissas do financiamento.</li>
                 <li>Revise as premissas do consórcio e os meses de contemplação.</li>
                 <li>Ative somente os tipos de lance que serão considerados.</li>
-                <li>Preencha aluguel, rentabilidade, valorização e inflação.</li>
+                <li>Revise a carta contemplada, aluguel de espera ou renda e a taxa do bem.</li>
                 <li>Compare as alternativas, os gráficos e a tabela executiva.</li>
                 <li>Gere o PDF depois de validar todas as premissas.</li>
               </ol>
@@ -385,26 +458,26 @@
               <h2>Navegação e botões</h2>
               <dl class="manual-definitions">
                 <div><dt>Premissas</dt><dd>Leva ao painel de entradas do cenário.</dd></div>
-                <div><dt>Resultado</dt><dd>Leva ao resumo da estratégia indicada e às quatro alternativas.</dd></div>
+                <div><dt>Resultado</dt><dd>Leva ao resumo da estratégia indicada e às cinco alternativas.</dd></div>
                 <div><dt>Fluxo</dt><dd>Leva aos gráficos de ranking e evolução do patrimônio.</dd></div>
                 <div><dt>Proposta</dt><dd>Leva ao resumo consultivo da simulação.</dd></div>
                 <div><dt>Restaurar</dt><dd>Recoloca todos os campos nos valores padrão. Os valores digitados não são salvos antes da restauração.</dd></div>
                 <div><dt>Manual</dt><dd>Abre estas orientações sem sair da simulação.</dd></div>
+                <div><dt>Aplicar na R2</dt><dd>Aparece quando a calculadora foi aberta pela R2 e devolve a simulação revisada ao objetivo de aquisição.</dd></div>
                 <div><dt>Gerar PDF</dt><dd>Abre a impressão do navegador para criar o relatório em PDF.</dd></div>
               </dl>
             </section>
 
             <section id="manual-imovel">
               <span class="manual-section-number">04</span>
-              <h2>Finalidade, imóvel e caixa</h2>
-              <h3>Investimento</h3>
-              <p>O modelo considera recebimento de aluguel depois que o imóvel estiver adquirido e disponível. O aluguel recebido reduz a necessidade líquida de caixa da estratégia.</p>
-              <h3>Moradia</h3>
-              <p>O modelo considera aluguel pago pela pessoa até o imóvel estar disponível. Depois da disponibilidade, esse aluguel deixa de ser contabilizado.</p>
+              <h2>Tipo, finalidade, preço e caixa</h2>
+              <p><strong>Imóvel</strong> usa a valorização informada. <strong>Veículo</strong> usa depreciação e não possui finalidade ou renda de aluguel.</p>
+              <p>Para imóvel, <strong>Moradia</strong> aplica aluguel pago antes do acesso e <strong>Investimento</strong> aplica receita líquida depois do acesso.</p>
               <dl class="manual-definitions">
-                <div><dt>Valor do imóvel novo</dt><dd>Referência para compra, entrada, crédito, aluguel e valorização.</dd></div>
+                <div><dt>Valor atual do bem</dt><dd>Referência para entrada, crédito, renda, valorização ou depreciação.</dd></div>
+                <div><dt>Preço na aquisição</dt><dd>Financiamento compra pelo valor atual no mês 1; consórcios usam o valor futuro do bem no mês da contemplação ou uso do crédito.</dd></div>
                 <div><dt>Valor em reserva</dt><dd>Recursos disponíveis no início. A reserva pode cobrir desembolsos que excedam o caixa mensal; o saldo remanescente é remunerado pela rentabilidade informada.</dd></div>
-                <div><dt>Caixa livre mensal</dt><dd>Valor máximo recorrente que a pessoa consegue destinar ao plano. A parcela, o aluguel pago e os demais desembolsos consomem esse caixa.</dd></div>
+                <div><dt>Caixa livre mensal</dt><dd>Valor máximo recorrente destinado ao plano. Parcelas, espera e demais desembolsos consomem esse caixa.</dd></div>
                 <div><dt>Horizonte de comparação</dt><dd>Mês em que os resultados finais são comparados. Todas as alternativas usam o mesmo horizonte.</dd></div>
               </dl>
               <div class="manual-note">O caixa livre mensal não é um valor adicional além da parcela. Se ele não for suficiente, a diferença consome a reserva.</div>
@@ -414,13 +487,14 @@
               <span class="manual-section-number">05</span>
               <h2>Premissas do financiamento</h2>
               <dl class="manual-definitions">
-                <div><dt>Entrada (%)</dt><dd>Percentual do valor do imóvel pago no início das alternativas com financiamento.</dd></div>
-                <div><dt>Prazo (meses)</dt><dd>Prazo contratual do financiamento no sistema SAC.</dd></div>
+                <div><dt>Sistema</dt><dd>SAC amortiza o saldo pelos meses restantes; PRICE calcula a prestação financeira sobre saldo corrigido e prazo remanescente.</dd></div>
+                <div><dt>Entrada (%)</dt><dd>Percentual do preço aplicável no mês da aquisição.</dd></div>
+                <div><dt>Prazo (meses)</dt><dd>Prazo contratual do financiamento.</dd></div>
                 <div><dt>Juros a.a. (%)</dt><dd>Taxa efetiva anual convertida para a taxa mensal equivalente.</dd></div>
-                <div><dt>TR a.a. (%)</dt><dd>Correção anual do saldo devedor, também convertida para a taxa mensal equivalente.</dd></div>
+                <div><dt>Indexador/correção a.a. (%)</dt><dd>Índice contratual genérico do saldo, que pode ser TR, IPCA, nenhum ou outro.</dd></div>
                 <div><dt>Seguro mensal</dt><dd>Valor adicionado à prestação enquanto o financiamento estiver ativo.</dd></div>
               </dl>
-              <p>No financiamento com amortização, a amortização extraordinária usa somente a sobra entre o caixa livre mensal e a prestação SAC ordinária. No cenário IQ, financiamento e consórcio coexistem até a contemplação simulada.</p>
+              <p>A amortização extraordinária usa somente a sobra entre o caixa livre mensal e a prestação ordinária SAC ou PRICE.</p>
             </section>
 
             <section id="manual-consorcio">
@@ -433,36 +507,38 @@
                 <div><dt>Prazo do consórcio</dt><dd>Quantidade de parcelas do plano.</dd></div>
                 <div><dt>Reajuste anual</dt><dd>Reajuste aplicado ao crédito e às parcelas do consórcio.</dd></div>
                 <div><dt>Mês de contemplação IQ</dt><dd>Mês assumido para a carta atuar como interveniente quitante do financiamento.</dd></div>
-                <div><dt>Mês do consórcio</dt><dd>Mês assumido para a contemplação e aquisição pelo consórcio.</dd></div>
+                <div><dt>Mês do consórcio direto</dt><dd>Mês assumido para a contemplação e aquisição pelo consórcio.</dd></div>
+                <div><dt>Posição líquida</dt><dd>Antes da contemplação, reconhece direito econômico descontado e VP das parcelas futuras. Depois, o direito é substituído pelo bem e a obrigação permanece.</dd></div>
+                <div><dt>Carta contemplada</dt><dd>Considera preço da carta, transferência, crédito líquido, complemento e parcelas restantes.</dd></div>
               </dl>
               <h3>Tipos de lance</h3>
-              <p>O lance embutido usa parte da própria carta e reduz o crédito líquido. Os lances livre e fixo entram na estrutura apenas quando suas caixas de seleção estão marcadas. Ative somente as modalidades compatíveis com a proposta real.</p>
+              <p>Lance fixo e livre são exclusivos entre si. O lance embutido pode compor o lance total, reduz o crédito líquido e não pode superar o percentual total. O caixa do cliente corresponde ao lance total menos a parcela embutida.</p>
               <div class="manual-note warning">Os meses de contemplação são hipóteses de simulação, não previsões ou garantias. A contemplação real depende de sorteio, lance e regras do grupo.</div>
             </section>
 
             <section id="manual-economia">
               <span class="manual-section-number">07</span>
-              <h2>Aluguel e economia</h2>
+              <h2>Uso, renda e economia</h2>
               <dl class="manual-definitions">
-                <div><dt>Entrega/chaves</dt><dd>Primeiro mês em que o imóvel pode ser usado ou alugado, respeitando também a aquisição em cada estratégia.</dd></div>
-                <div><dt>Aluguel pago a.m.</dt><dd>Percentual mensal usado para estimar o aluguel pago quando a finalidade é Moradia.</dd></div>
-                <div><dt>Aluguel bruto a.m.</dt><dd>Percentual mensal usado para estimar a receita bruta quando a finalidade é Investimento.</dd></div>
-                <div><dt>Reajuste do aluguel</dt><dd>Reajuste anual aplicado ao aluguel pago ou recebido.</dd></div>
-                <div><dt>Redutores do aluguel</dt><dd>Representam vacância, administração, manutenção, tributos e outros descontos agregados.</dd></div>
+                <div><dt>Disponibilidade/uso</dt><dd>Primeiro mês em que o bem pode ser usado ou gerar renda, respeitando a aquisição em cada estratégia.</dd></div>
+                <div><dt>Aluguel pago</dt><dd>Premissa opcional da finalidade Moradia, antes do acesso ao imóvel.</dd></div>
+                <div><dt>Receita bruta</dt><dd>Premissa opcional da finalidade Investimento, depois do acesso ao imóvel.</dd></div>
+                <div><dt>Redutores da renda</dt><dd>Representam vacância, administração, manutenção, tributos e outros descontos agregados.</dd></div>
                 <div><dt>Rentabilidade líquida a.a.</dt><dd>Retorno anual aplicado ao saldo financeiro que permanece investido.</dd></div>
-                <div><dt>Valorização do imóvel a.a.</dt><dd>Crescimento anual assumido para o valor do imóvel.</dd></div>
+                <div><dt>Taxa do bem</dt><dd>Valorização do imóvel ou depreciação do veículo, selecionada automaticamente.</dd></div>
                 <div><dt>Inflação esperada a.a.</dt><dd>Taxa usada para converter o patrimônio final em poder de compra de hoje.</dd></div>
               </dl>
             </section>
 
             <section id="manual-alternativas">
               <span class="manual-section-number">08</span>
-              <h2>As quatro alternativas</h2>
+              <h2>As cinco alternativas</h2>
               <ol class="manual-alternatives">
-                <li><strong>Financiamento sem amortização</strong><span>Compra no início, paga entrada e prestações SAC sem amortização extraordinária e mantém eventual sobra de caixa investida.</span></li>
-                <li><strong>Financiamento com amortização</strong><span>Compra no início e usa a sobra mensal depois da prestação SAC para reduzir o saldo devedor.</span></li>
-                <li><strong>Financiamento + consórcio IQ</strong><span>Compra no início por financiamento e mantém o consórcio até a carta atuar como interveniente quitante.</span></li>
-                <li><strong>Consórcio</strong><span>A aquisição depende do mês de contemplação simulado e pode exigir lance ou recursos próprios.</span></li>
+                <li><strong>Financiamento sem amortização</strong><span>Compra pelo preço aplicável e paga as prestações SAC ou PRICE.</span></li>
+                <li><strong>Financiamento com amortização</strong><span>Usa a sobra mensal depois da prestação para reduzir prazo.</span></li>
+                <li><strong>Financiamento + consórcio IQ</strong><span>Quita o financiamento na contemplação, mantendo a obrigação futura do grupo.</span></li>
+                <li><strong>Consórcio direto</strong><span>Reconhece posição líquida da cota antes e depois da contemplação.</span></li>
+                <li><strong>Carta contemplada</strong><span>Compra uma carta já contemplada e assume as parcelas restantes.</span></li>
               </ol>
             </section>
 
@@ -472,9 +548,9 @@
               <dl class="manual-definitions">
                 <div><dt>Estratégia indicada</dt><dd>Alternativa viável com maior Patrimônio Acumulado em reais de hoje.</dd></div>
                 <div><dt>Patrimônio Acumulado</dt><dd>Patrimônio final convertido para poder de compra de hoje pela inflação esperada.</dd></div>
-                <div><dt>Custo</dt><dd>Soma nominal dos desembolsos dentro do horizonte, incluindo entrada ou lance, parcelas e aluguel pago quando aplicável.</dd></div>
+                <div><dt>Custo</dt><dd>Soma nominal dos desembolsos dentro do horizonte, incluindo entrada, lance, parcelas e aluguel de espera.</dd></div>
                 <div><dt>Parcela inicial</dt><dd>Composição do primeiro desembolso recorrente. No IQ, financiamento e consórcio aparecem separadamente.</dd></div>
-                <div><dt>Aquisição</dt><dd>Mês em que o imóvel entra no patrimônio da estratégia.</dd></div>
+                <div><dt>Aquisição</dt><dd>Mês em que o bem entra no patrimônio da estratégia.</dd></div>
               </dl>
               <p>O gráfico de ranking compara o Patrimônio Acumulado final. O gráfico de evolução mostra a trajetória ao longo do tempo. A tabela executiva reúne entrada ou lance, parcela inicial, aquisição, custo e patrimônio.</p>
               <div class="manual-note">Custo é um acumulado nominal; Patrimônio Acumulado está em reais de hoje. Não subtraia um diretamente do outro e não escolha uma alternativa apenas pelo menor custo.</div>
@@ -490,23 +566,24 @@
                 <li>Mantenha orientação e escala padrão, salvo necessidade específica.</li>
                 <li>Verifique a visualização antes de salvar.</li>
               </ol>
-              <p>O relatório inclui as quatro alternativas, a recomendação do cenário, patrimônio, custo, gráficos comparativos e premissas principais. Ele reflete o estado atual da tela; a ferramenta não salva histórico automaticamente.</p>
+              <p>O relatório inclui as cinco alternativas, a recomendação do cenário, patrimônio, custo, gráficos comparativos e premissas principais. Ele reflete o estado atual da tela; a ferramenta não salva histórico automaticamente.</p>
             </section>
 
             <section id="manual-cuidados">
               <span class="manual-section-number">11</span>
               <h2>Cuidados importantes</h2>
-              <p>Em cada mês, o modelo adiciona o caixa livre e eventual aluguel recebido, deduz entrada, lance, parcelas e eventual aluguel pago, e usa a reserva para cobrir diferenças. Uma alternativa que dependa de recursos além do caixa e da reserva informados não deve ser comparada como recomendação executável.</p>
+              <p>Em cada mês, o modelo adiciona caixa livre e renda, deduz entrada, lances, parcelas, espera e posse, e usa a reserva para cobrir diferenças. Uma alternativa com déficit não coberto não participa da recomendação.</p>
               <ul>
                 <li>Não trate o caixa livre mensal como dinheiro adicional além da parcela.</li>
                 <li>Não interprete contemplação simulada como garantia.</li>
                 <li>Não informe rentabilidade bruta quando o campo pede rentabilidade líquida.</li>
-                <li>Não conte aluguel recebido antes da aquisição e da entrega das chaves.</li>
+                <li>Não conte renda antes da aquisição e da disponibilidade do bem.</li>
                 <li>Não use lances incompatíveis com o regulamento real.</li>
-                <li>Não confunda reajuste do consórcio, inflação, valorização do imóvel e rentabilidade financeira.</li>
+                <li>Não ignore o VP das parcelas futuras dos consórcios.</li>
+                <li>Não confunda indexador, reajuste do consórcio, inflação, taxa do bem e rentabilidade financeira.</li>
               </ul>
               <h3>Análise de sensibilidade</h3>
-              <p>Altere uma premissa por vez e observe se a estratégia indicada muda. Teste contemplação mais cedo e mais tarde, rentabilidade e valorização menores, inflação diferente, maior vacância e condições conservadoras de juros e TR.</p>
+              <p>Altere uma premissa por vez. Teste horizontes de 60, 120, 240 e 420 meses, contemplação mais cedo e mais tarde, preço travado e de mercado, SAC e PRICE.</p>
             </section>
 
             <section id="manual-problemas">
@@ -515,7 +592,7 @@
               <dl class="manual-definitions troubleshooting">
                 <div><dt>Os resultados não mudam</dt><dd>Saia do campo ou pressione Tab, confira o formato do número e tente novamente.</dd></div>
                 <div><dt>Um percentual parece incorreto</dt><dd>Digite percentuais como números usuais: 12 para 12% e 0,5 para 0,5%.</dd></div>
-                <div><dt>Uma alternativa aparece inviável</dt><dd>Compare parcela, caixa mensal, reserva, entrada ou lance e aluguel pago antes das chaves.</dd></div>
+                <div><dt>Uma alternativa aparece inviável</dt><dd>Compare parcela, caixa mensal, reserva, entrada, lance, espera, posse e custo inicial da carta.</dd></div>
                 <div><dt>O PDF não é salvo automaticamente</dt><dd>O botão abre a impressão do navegador. Selecione “Salvar como PDF” no destino.</dd></div>
                 <div><dt>Ícones não aparecem</dt><dd>Os textos continuam identificando os botões. Verifique a conexão com a internet para carregar a biblioteca de ícones.</dd></div>
               </dl>
@@ -525,16 +602,16 @@
               <span class="manual-section-number">13</span>
               <h2>Checklist antes da recomendação</h2>
               <ul class="manual-checklist">
-                <li>A finalidade Investimento ou Moradia está correta.</li>
-                <li>O valor do imóvel corresponde ao bem analisado.</li>
+                <li>Tipo do bem, finalidade e convenção de preço estão corretos.</li>
+                <li>O valor atual corresponde ao bem analisado.</li>
                 <li>A reserva está realmente disponível.</li>
                 <li>O caixa livre mensal é sustentável e não inclui a própria parcela.</li>
                 <li>O horizonte é igual para todas as alternativas.</li>
-                <li>Juros, TR, seguro, prazo e entrada foram confirmados.</li>
+                <li>SAC/PRICE, juros, indexador, seguro, prazo e entrada foram confirmados.</li>
                 <li>Taxas, prazo, reajuste e regras do consórcio foram confirmados.</li>
                 <li>Os meses de contemplação foram tratados como hipóteses.</li>
                 <li>Os lances ativos são compatíveis com a proposta real.</li>
-                <li>Aluguel, rentabilidade, valorização e inflação foram revisados.</li>
+                <li>Carta contemplada, renda, espera, posse, taxa do bem e inflação foram revisados.</li>
                 <li>O PDF foi revisado antes de ser apresentado.</li>
               </ul>
             </section>
