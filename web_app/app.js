@@ -656,9 +656,11 @@ function buildStrategyRows(p, sharedRows, schedules, strategyId) {
       month >= availability
         ? shared.rentReceivedBase
         : 0;
-    const outputs = entryOrBid + payment + rentPaid;
+    const productOutflow = entryOrBid + payment;
+    const outputs = productOutflow + rentPaid;
     const inputs = rentReceived;
-    const freeFlow = shared.cashFree + inputs - outputs;
+    const netCashImpact = inputs - outputs;
+    const freeFlow = shared.cashFree + netCashImpact;
     const beforeAdjustment = month === 1 ? p.reserve + freeFlow : invested * (1 + returnMonthly) + freeFlow;
     const capitalMonth = Math.max(0, -beforeAdjustment);
     if (capitalMonth > 0.01 && firstDeficitMonth === null) {
@@ -677,10 +679,12 @@ function buildStrategyRows(p, sharedRows, schedules, strategyId) {
       month,
       entryOrBid,
       payment,
+      productOutflow,
       rentPaid,
       rentReceived,
       outputs,
       inputs,
+      netCashImpact,
       freeFlow,
       invested,
       capitalMonth,
@@ -726,12 +730,47 @@ function getInitialPaymentLines(id, schedules) {
   return [{ label: "Consórcio", value: schedules.direct.installmentInitial || 0 }];
 }
 
+function sumSchedulePayments(rows, paymentKey = "payment") {
+  return rows.reduce((sum, row) => sum + (row[paymentKey] || 0), 0);
+}
+
+function getLifetimeContractualOutflow(p, schedules, id) {
+  const entry = p.propertyValue * p.entryPct;
+
+  if (id === "fin") {
+    return entry + sumSchedulePayments(schedules.financing);
+  }
+
+  if (id === "amort") {
+    return entry + sumSchedulePayments(schedules.amortization.rows);
+  }
+
+  if (id === "iq") {
+    return entry + sumSchedulePayments(schedules.iq.rows);
+  }
+
+  if (id === "cons") {
+    return schedules.direct.clientBid + sumSchedulePayments(schedules.direct.rows);
+  }
+
+  if (id === "card" && p.cardEnabled) {
+    return schedules.card.initialCost + sumSchedulePayments(schedules.card.rows, "installment");
+  }
+
+  return 0;
+}
+
 function summarizeStrategy(p, sharedRows, strategyRows, schedules, id) {
   const horizon = p.horizonMonths;
   const final = strategyRows[horizon - 1];
-  const totalOutputs = strategyRows.slice(0, horizon).reduce((sum, row) => sum + row.outputs, 0);
-  const totalInputs = strategyRows.slice(0, horizon).reduce((sum, row) => sum + row.inputs, 0);
   const horizonRows = strategyRows.slice(0, horizon);
+  const productOutflowWithinHorizon = horizonRows.reduce((sum, row) => sum + row.productOutflow, 0);
+  const rentPaidWithinHorizon = horizonRows.reduce((sum, row) => sum + row.rentPaid, 0);
+  const rentReceivedWithinHorizon = horizonRows.reduce((sum, row) => sum + row.rentReceived, 0);
+  const totalOutputs = productOutflowWithinHorizon + rentPaidWithinHorizon;
+  const totalInputs = rentReceivedWithinHorizon;
+  const netCashImpactWithinHorizon = totalInputs - totalOutputs;
+  const lifetimeContractualOutflow = getLifetimeContractualOutflow(p, schedules, id);
   const firstDeficitRow = horizonRows.find((row) => row.capitalMonth > 0.01);
   const totalUncoveredDeficit = horizonRows.reduce((sum, row) => sum + row.capitalMonth, 0);
   const inflationFactor = Math.pow(1 + p.inflationPct, horizon / 12);
@@ -739,7 +778,8 @@ function summarizeStrategy(p, sharedRows, strategyRows, schedules, id) {
   const gapFv = final.adjustedWorth - baseFv;
   const entry = p.propertyValue * p.entryPct;
   const isEnabled = id !== "card" || p.cardEnabled;
-  const isViable = isEnabled && final.capitalVf <= 1;
+  const isAffordable = final.capitalVf <= 1;
+  const isViable = isEnabled && isAffordable;
 
   const acquisitionMonth =
     id === "cons"
@@ -756,7 +796,11 @@ function summarizeStrategy(p, sharedRows, strategyRows, schedules, id) {
           ? p.consMonths
           : id === "cons"
             ? p.consMonths
-            : p.cardPurchaseMonth + p.cardRemainingMonths - 1;
+            : !p.cardEnabled
+              ? null
+              : p.cardRemainingMonths > 0
+                ? p.cardPurchaseMonth + p.cardRemainingMonths - 1
+                : p.cardPurchaseMonth;
 
   const entryOrInitial =
     id === "cons"
@@ -774,10 +818,26 @@ function summarizeStrategy(p, sharedRows, strategyRows, schedules, id) {
     payoffMonth,
     entryOrInitial,
     initialPaymentLines: getInitialPaymentLines(id, schedules),
+    productOutflowWithinHorizon,
+    rentPaidWithinHorizon,
+    rentReceivedWithinHorizon,
+    netCashImpactWithinHorizon,
+    lifetimeContractualOutflow,
+    cashMetrics: {
+      horizonMonths: horizon,
+      productOutflow: productOutflowWithinHorizon,
+      rentPaid: rentPaidWithinHorizon,
+      rentReceived: rentReceivedWithinHorizon,
+      totalOutflow: totalOutputs,
+      netCashImpact: netCashImpactWithinHorizon,
+      lifetimeContractualOutflow,
+    },
     totalOutputs,
     totalInputs,
-    netFlow: totalInputs - totalOutputs,
+    netFlow: netCashImpactWithinHorizon,
     capitalVf: final.capitalVf,
+    isEnabled,
+    isAffordable,
     isViable,
     firstDeficitMonth: firstDeficitRow?.month ?? null,
     totalUncoveredDeficit,
@@ -852,9 +912,17 @@ function summarizeR2Strategy(strategy) {
     payoffMonth: strategy.payoffMonth,
     entryOrInitial: strategy.entryOrInitial,
     initialPaymentLines: strategy.initialPaymentLines,
+    productOutflowWithinHorizon: strategy.productOutflowWithinHorizon,
+    rentPaidWithinHorizon: strategy.rentPaidWithinHorizon,
+    rentReceivedWithinHorizon: strategy.rentReceivedWithinHorizon,
+    netCashImpactWithinHorizon: strategy.netCashImpactWithinHorizon,
+    lifetimeContractualOutflow: strategy.lifetimeContractualOutflow,
+    cashMetrics: strategy.cashMetrics,
     totalOutputs: strategy.totalOutputs,
     totalInputs: strategy.totalInputs,
     netFlow: strategy.netFlow,
+    isEnabled: strategy.isEnabled,
+    isAffordable: strategy.isAffordable,
     isViable: strategy.isViable,
     firstDeficitMonth: strategy.firstDeficitMonth,
     totalUncoveredDeficit: strategy.totalUncoveredDeficit,
@@ -1378,228 +1446,6 @@ function renderProposal(result) {
   });
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function printMetric(label, value) {
-  return `
-    <div class="print-metric">
-      <span>${escapeHtml(label)}</span>
-      <strong>${value}</strong>
-    </div>
-  `;
-}
-
-function getAlternativeDescription(result, strategy) {
-  const p = result.inputs;
-  const financed = result.derived.financed;
-  const entry = result.derived.entry;
-
-  if (strategy.id === "fin") {
-    return `Financiamento ${p.financingSystem} de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)}, sem amortização extraordinária até o final do prazo de ${p.finMonths} meses.`;
-  }
-
-  if (strategy.id === "amort") {
-    return `Financiamento ${p.financingSystem} de ${formatCurrency(financed)}, com entrada de ${formatCurrency(entry)} e amortização mensal usando a disponibilidade de caixa prevista até a quitação.`;
-  }
-
-  if (strategy.id === "iq") {
-    return `Financiamento ${p.financingSystem} de ${formatCurrency(financed)}, combinado com consórcio de aproximadamente ${formatCurrency(result.schedules.iq.creditUpdated)} no mês ${p.iqMonth}. O patrimônio desconta o VP das parcelas futuras até o mês ${p.consMonths}.`;
-  }
-
-  if (strategy.id === "card") {
-    return `Carta contemplada com crédito líquido de ${formatCurrency(result.schedules.card.netCredit)}, preço de compra de ${formatCurrency(p.cardPrice)}, taxa de transferência de ${formatCurrency(p.cardTransferFee)} e ${p.cardRemainingMonths} parcelas restantes.`;
-  }
-
-  const bidParts = [];
-  if (p.useEmbeddedBid) bidParts.push(`lance embutido de ${formatPercent(result.schedules.direct.embedded)}`);
-  if (p.useFreeBid) bidParts.push(`lance livre de ${formatPercent(p.freeBidPct)}`);
-  if (p.useFixedBid) bidParts.push(`lance fixo de ${formatPercent(p.fixedBidPct)}`);
-  const bidText = bidParts.length ? `, com ${bidParts.join(" e ")}` : "";
-  const clientBidText = result.schedules.direct.clientBid > 0.01
-    ? ` Lance adicional de recursos próprios estimado em ${formatCurrency(result.schedules.direct.clientBid)}.`
-    : " Sem lance adicional de recursos próprios no cenário base.";
-
-  return `Consórcio direto para preço de aquisição de ${formatCurrency(result.schedules.direct.acquisitionPrice)}, com carta bruta estimada de ${formatCurrency(result.schedules.direct.grossCredit)}${bidText}, contemplação simulada no mês ${p.directMonth}.${clientBidText}`;
-}
-
-function renderPrintAlternativeCards(result) {
-  return result.strategies
-    .map((strategy, index) => `
-      <article class="print-alt-card" style="--strategy-color: ${strategyColors[strategy.id]}">
-        <div class="print-alt-number">${index + 1}</div>
-        <div class="print-alt-content">
-          <h3>${escapeHtml(strategy.name)}</h3>
-          <p>${escapeHtml(getAlternativeDescription(result, strategy))}</p>
-          <div class="print-alt-metrics">
-            ${printMetric("Aquisição", escapeHtml(formatMonth(strategy.acquisitionMonth)))}
-            ${printMetric("Entrada/lance", escapeHtml(formatCurrency(strategy.entryOrInitial)))}
-            ${printMetric("Custo", escapeHtml(formatCurrency(strategy.totalOutputs)))}
-            ${printMetric("Patrimônio Acumulado", escapeHtml(formatStrategyPatrimony(strategy)))}
-          </div>
-        </div>
-      </article>
-    `)
-    .join("");
-}
-
-function renderPrintBarRows(result, valueKey) {
-  const viable = result.strategies.filter((strategy) => strategy.isViable);
-  const maxValue = Math.max(1, ...viable.map((strategy) => Math.abs(strategy[valueKey])));
-
-  return result.strategies
-    .map((strategy) => {
-      const isViable = strategy.isViable;
-      const width = isViable ? Math.max(2, Math.abs(strategy[valueKey]) / maxValue * 100) : 0;
-      const value = valueKey === "adjustedToday"
-        ? formatStrategyPatrimony(strategy)
-        : isViable ? formatCurrency(strategy[valueKey]) : "Inviável";
-      const color = valueKey === "adjustedToday" ? strategyColors[strategy.id] : "#766300";
-
-      return `
-        <div class="print-chart-row${isViable ? "" : " is-infeasible"}">
-          <span>${escapeHtml(strategy.short)}</span>
-          <div class="print-chart-track">
-            <div class="print-chart-fill" style="width: ${width}%; background: ${color};"></div>
-          </div>
-          <strong>${escapeHtml(value)}</strong>
-        </div>
-      `;
-    })
-    .join("");
-}
-
-function renderPrintAssumptions(result) {
-  const p = result.inputs;
-  const items = [
-    [p.assetType === "Veiculo" ? "Veículo" : "Imóvel", formatCurrency(p.propertyValue)],
-    ["Reserva", formatCurrency(p.reserve)],
-    ["Caixa mensal", formatCurrency(p.monthlyCash)],
-    ["Horizonte", `${p.horizonMonths} meses`],
-    ["Sistema", p.financingSystem],
-    ["Rentabilidade", formatPercent(p.annualReturn)],
-    ["Taxa do bem", formatPercent(p.selectedAssetRate)],
-    ["Inflação", formatPercent(p.inflationPct)],
-  ];
-  if (p.assetType === "Imovel") items.splice(4, 0, ["Finalidade", p.usage]);
-
-  return items
-    .map(([label, value]) => printMetric(label, escapeHtml(value)))
-    .join("");
-}
-
-function renderPrintRecommendation(result) {
-  if (!result.best) {
-    return `
-      <section class="print-card print-recommendation-card">
-        <h2>Nenhuma alternativa viável no cenário</h2>
-        <p>Com o caixa livre mensal e a reserva informados, nenhuma alternativa se sustenta sem déficit não coberto. Ajuste as premissas antes de emitir uma recomendação.</p>
-      </section>
-    `;
-  }
-
-  const gap = result.second ? result.best.adjustedToday - result.second.adjustedToday : 0;
-  const secondText = result.second
-    ? `${formatCurrency(gap)} acima da segunda alternativa.`
-    : "Única alternativa viável no cenário informado.";
-
-  return `
-    <section class="print-card print-recommendation-card">
-      <h2>${escapeHtml(result.best.name)} aparece como a melhor alternativa neste cenário.</h2>
-      <div class="print-why-grid">
-        <article>
-          <i></i>
-          <h3>1. Maior patrimônio</h3>
-          <p>Patrimônio Acumulado de ${escapeHtml(formatStrategyPatrimony(result.best))}.</p>
-        </article>
-        <article>
-          <i></i>
-          <h3>2. Vantagem clara</h3>
-          <p>${escapeHtml(secondText)}</p>
-        </article>
-        <article>
-          <i></i>
-          <h3>3. Custo estimado</h3>
-          <p>Custo de ${escapeHtml(formatCurrency(result.best.totalOutputs))} no horizonte analisado.</p>
-        </article>
-      </div>
-      <div class="print-conclusion">
-        <h3>Conclusão</h3>
-        <p>A alternativa ${escapeHtml(result.best.name)} se destaca por entregar o maior Patrimônio Acumulado entre as opções viáveis analisadas, mantendo um custo estimado compatível com as premissas de caixa e contemplação adotadas no cenário.</p>
-      </div>
-    </section>
-  `;
-}
-
-function renderPrintReport(result) {
-  const container = document.getElementById("printReport");
-  if (!container) return;
-
-  const bestName = result.best ? result.best.name : "Nenhuma viável";
-  const bestPatrimony = result.best ? formatStrategyPatrimony(result.best) : "Inviável";
-
-  container.innerHTML = `
-    <section class="print-page print-page-light">
-      <header class="print-header">
-        <div class="print-wordmark" aria-label="Grupo Ável"><span>grupo</span><i></i><strong>ável.</strong></div>
-        <b></b>
-      </header>
-      <h1>Alternativas analisadas</h1>
-      <p class="print-lead">Cinco caminhos foram analisados para a aquisição do bem. Cada alternativa usa as mesmas premissas de valor, prazo, caixa, preço de aquisição e rentabilidade.</p>
-      <div class="print-alt-list">
-        ${renderPrintAlternativeCards(result)}
-      </div>
-      <footer>Ável - Relatório comparativo de aquisição <strong>Página 1</strong></footer>
-    </section>
-
-    <section class="print-page print-page-dark">
-      <header class="print-header">
-        <div class="print-wordmark" aria-label="Grupo Ável"><span>grupo</span><i></i><strong>ável.</strong></div>
-        <b></b>
-      </header>
-      <div class="print-recommendation-hero">
-        <div>
-          <h1>Recomendação<br>do cenário</h1>
-          <p>Com as premissas informadas, a indicação considera Patrimônio Acumulado, custo estimado, momento de aquisição e capacidade de manter o plano.</p>
-        </div>
-        <aside>
-          ${printMetric("Estratégia indicada", escapeHtml(bestName))}
-          ${printMetric("Patrimônio Acumulado", escapeHtml(bestPatrimony))}
-        </aside>
-      </div>
-      ${renderPrintRecommendation(result)}
-      <footer>Ável - Relatório comparativo de aquisição <strong>Página 2</strong></footer>
-    </section>
-
-    <section class="print-page print-page-light">
-      <header class="print-header">
-        <div class="print-wordmark" aria-label="Grupo Ável"><span>grupo</span><i></i><strong>ável.</strong></div>
-        <b></b>
-      </header>
-      <h1>Gráficos e premissas</h1>
-      <section class="print-chart-card">
-        <h2>Patrimônio Acumulado</h2>
-        ${renderPrintBarRows(result, "adjustedToday")}
-      </section>
-      <section class="print-chart-card">
-        <h2>Custo</h2>
-        ${renderPrintBarRows(result, "totalOutputs")}
-      </section>
-      <section class="print-assumptions-card">
-        <h2>Premissas usadas</h2>
-        <div>${renderPrintAssumptions(result)}</div>
-      </section>
-      <footer>Ável - Relatório comparativo de aquisição <strong>Página 3</strong></footer>
-    </section>
-  `;
-}
-
 function render(result) {
   renderHero(result);
   renderStrategyCards(result);
@@ -1608,13 +1454,49 @@ function render(result) {
   renderComparisonRows(result);
   renderAssumptions(result);
   renderProposal(result);
-  renderPrintReport(result);
 }
 
 function update() {
   const state = getDomState();
   const result = calculateScenario(state);
   render(result);
+}
+
+function readStoredPlannerName() {
+  try {
+    return window.localStorage.getItem("consfin.reportPlannerName") || "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function storePlannerName(plannerName) {
+  try {
+    window.localStorage.setItem("consfin.reportPlannerName", plannerName);
+  } catch (error) {
+    // O relatório continua funcionando quando o armazenamento local não está disponível.
+  }
+}
+
+async function waitForReportLayout(callback) {
+  if (document.fonts) {
+    const reportFonts = [
+      '400 10px "Inter"',
+      '500 10px "Inter"',
+      '600 10px "Inter"',
+      '700 10px "Inter"',
+      '500 10px "Space Grotesk"',
+      '600 10px "Space Grotesk"',
+      '700 10px "Space Grotesk"',
+    ];
+    await Promise.allSettled(reportFonts.map((font) => document.fonts.load(font)));
+    await document.fonts.ready;
+  }
+
+  await new Promise((resolve) => {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(resolve));
+  });
+  callback();
 }
 
 function init() {
@@ -1677,7 +1559,75 @@ function init() {
     if (event.target === manualDialog) manualDialog.close();
   });
 
-  document.getElementById("printButton").addEventListener("click", () => window.print());
+  const printButton = document.getElementById("printButton");
+  const reportDialog = document.getElementById("reportDialog");
+  const reportForm = document.getElementById("reportForm");
+  const reportClientName = document.getElementById("reportClientName");
+  const reportPlannerName = document.getElementById("reportPlannerName");
+  const reportDialogError = document.getElementById("reportDialogError");
+  const reportCloseButton = document.getElementById("reportCloseButton");
+  const reportCancelButton = document.getElementById("reportCancelButton");
+
+  reportClientName.value = importedScenario?.clientName || "";
+  reportPlannerName.value = readStoredPlannerName();
+
+  printButton.addEventListener("click", () => {
+    reportDialogError.hidden = true;
+    reportDialogError.textContent = "";
+    if (!reportClientName.value && importedScenario?.clientName) {
+      reportClientName.value = importedScenario.clientName;
+    }
+    reportDialog.showModal();
+    window.requestAnimationFrame(() => {
+      const firstEmptyField = [reportClientName, reportPlannerName].find((field) => !field.value.trim());
+      (firstEmptyField || reportClientName).focus();
+    });
+  });
+
+  reportCloseButton.addEventListener("click", () => reportDialog.close());
+  reportCancelButton.addEventListener("click", () => reportDialog.close());
+  reportDialog.addEventListener("close", () => printButton.focus());
+
+  reportForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!reportForm.reportValidity()) return;
+
+    const engine = window.ConsfinReportEngine;
+    if (!engine) {
+      reportDialogError.textContent = "Não foi possível preparar o relatório. Reabra a ferramenta e tente novamente.";
+      reportDialogError.hidden = false;
+      return;
+    }
+
+    const clientName = reportClientName.value.trim();
+    const plannerName = reportPlannerName.value.trim();
+    const priority = new FormData(reportForm).get("reportPriority") || engine.DEFAULT_PRIORITY;
+    const result = calculateScenario(getDomState());
+    const reportContext = {
+      clientName,
+      plannerName,
+      priority,
+      source: importedScenario ? "r2" : "standalone",
+      generatedAt: new Date().toISOString(),
+    };
+
+    try {
+      const report = engine.buildDecisionReport(result, reportContext);
+      document.getElementById("printReport").innerHTML = engine.renderReportHtml(report);
+      storePlannerName(plannerName);
+      reportDialog.close();
+
+      const originalTitle = document.title;
+      document.title = `Estratégias de Crédito - ${clientName}`;
+      window.addEventListener("afterprint", () => {
+        document.title = originalTitle;
+      }, { once: true });
+      waitForReportLayout(() => window.print());
+    } catch (error) {
+      reportDialogError.textContent = "Não foi possível preparar o relatório. Revise a simulação e tente novamente.";
+      reportDialogError.hidden = false;
+    }
+  });
 
   const applyR2Button = document.getElementById("applyR2Button");
   if (importedScenario && importedScenario.returnToken && window.opener) {
@@ -1701,11 +1651,6 @@ function init() {
     });
   }
 
-  if (window.lucide) {
-    window.lucide.createIcons();
-  } else {
-    window.addEventListener("load", () => window.lucide?.createIcons());
-  }
 }
 
 if (typeof document !== "undefined") {
