@@ -8,14 +8,9 @@
       name="description"
       content="Interface consultiva para comparar cinco estratégias de aquisição de imóvel ou veículo."
     />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="styles.css" />
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+    <link rel="stylesheet" href="report-print.css" media="print" />
+    <script src="report-engine.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -31,20 +26,20 @@
       </nav>
       <div class="top-actions">
         <button class="icon-button secondary" type="button" id="resetButton" title="Restaurar premissas">
-          <i data-lucide="rotate-ccw" aria-hidden="true"></i>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
           <span>Restaurar</span>
         </button>
         <button class="icon-button secondary" type="button" id="manualButton" title="Abrir manual de uso">
-          <i data-lucide="book-open" aria-hidden="true"></i>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
           <span>Manual</span>
         </button>
         <button class="icon-button accent" type="button" id="applyR2Button" title="Aplicar resultado na R2" hidden>
-          <i data-lucide="check-circle-2" aria-hidden="true"></i>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><path d="m9 11 3 3L22 4"/></svg>
           <span>Aplicar na R2</span>
         </button>
-        <button class="icon-button accent" type="button" id="printButton" title="Gerar PDF">
-          <i data-lucide="printer" aria-hidden="true"></i>
-          <span>Gerar PDF</span>
+        <button class="icon-button accent" type="button" id="printButton" title="Gerar relatório">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>
+          <span>Gerar relatório</span>
         </button>
       </div>
     </header>
@@ -389,6 +384,73 @@
       </section>
     </main>
 
+    <dialog
+      class="report-dialog"
+      id="reportDialog"
+      aria-labelledby="reportDialogTitle"
+      aria-describedby="reportDialogDescription"
+    >
+      <form class="report-dialog-card" id="reportForm">
+        <header class="report-dialog-header">
+          <div>
+            <span class="eyebrow">Relatório de aquisição</span>
+            <h2 id="reportDialogTitle">Gerar relatório</h2>
+            <p id="reportDialogDescription">Confirme os dados do documento e escolha o foco do parecer.</p>
+          </div>
+          <button class="report-dialog-close" type="button" id="reportCloseButton" aria-label="Fechar" title="Fechar">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </header>
+
+        <div class="report-dialog-body">
+          <div class="report-identity-grid">
+            <label>
+              <span>Cliente</span>
+              <input id="reportClientName" name="clientName" type="text" autocomplete="name" maxlength="80" required />
+            </label>
+            <label>
+              <span>Planejador financeiro</span>
+              <input id="reportPlannerName" name="plannerName" type="text" autocomplete="name" maxlength="80" required />
+            </label>
+          </div>
+
+          <fieldset class="report-priority-fieldset">
+            <legend>Prioridade do parecer</legend>
+            <p>A recomendação seguirá este critério.</p>
+            <div class="report-priority-grid">
+              <label class="report-priority-option">
+                <input type="radio" name="reportPriority" value="wealth" checked />
+                <span><strong>Preservar mais patrimônio</strong><small>Prioriza o maior patrimônio corrigido no fim do período.</small></span>
+              </label>
+              <label class="report-priority-option">
+                <input type="radio" name="reportPriority" value="cost" />
+                <span><strong>Menor custo</strong><small>Prioriza o menor custo contratual entre as alternativas.</small></span>
+              </label>
+              <label class="report-priority-option">
+                <input type="radio" name="reportPriority" value="payoff" />
+                <span><strong>Quitar antes</strong><small>Prioriza o compromisso com menor prazo de pagamento.</small></span>
+              </label>
+              <label class="report-priority-option">
+                <input type="radio" name="reportPriority" value="acquisition" />
+                <span><strong>Adquirir antes</strong><small>Prioriza o primeiro momento possível de aquisição.</small></span>
+              </label>
+              <label class="report-priority-option report-priority-option-wide">
+                <input type="radio" name="reportPriority" value="compare" />
+                <span><strong>Comparar sem recomendação</strong><small>Apresenta os líderes de cada critério sem emitir uma recomendação.</small></span>
+              </label>
+            </div>
+          </fieldset>
+
+          <p class="report-dialog-error" id="reportDialogError" role="alert" hidden></p>
+        </div>
+
+        <footer class="report-dialog-actions">
+          <button class="report-action-secondary" type="button" id="reportCancelButton">Cancelar</button>
+          <button class="report-action-primary" type="submit">Gerar relatório</button>
+        </footer>
+      </form>
+    </dialog>
+
     <dialog class="manual-dialog" id="manualDialog" aria-labelledby="manualTitle">
       <div class="manual-window">
         <header class="manual-header">
@@ -448,7 +510,7 @@
                 <li>Ative somente os tipos de lance que serão considerados.</li>
                 <li>Revise a carta contemplada, aluguel de espera ou renda e a taxa do bem.</li>
                 <li>Compare as alternativas, os gráficos e a tabela executiva.</li>
-                <li>Gere o PDF depois de validar todas as premissas.</li>
+                <li>Gere o relatório depois de validar todas as premissas.</li>
               </ol>
               <p>Os resultados são recalculados automaticamente a cada alteração. Não existe botão separado para executar a simulação.</p>
             </section>
@@ -464,7 +526,7 @@
                 <div><dt>Restaurar</dt><dd>Recoloca todos os campos nos valores padrão. Os valores digitados não são salvos antes da restauração.</dd></div>
                 <div><dt>Manual</dt><dd>Abre estas orientações sem sair da simulação.</dd></div>
                 <div><dt>Aplicar na R2</dt><dd>Aparece quando a calculadora foi aberta pela R2 e devolve a simulação revisada ao objetivo de aquisição.</dd></div>
-                <div><dt>Gerar PDF</dt><dd>Abre a impressão do navegador para criar o relatório em PDF.</dd></div>
+                <div><dt>Gerar relatório</dt><dd>Solicita os dados do cliente e abre a impressão do navegador para salvar o parecer em PDF.</dd></div>
               </dl>
             </section>
 
@@ -546,9 +608,10 @@
               <span class="manual-section-number">09</span>
               <h2>Como ler os resultados</h2>
               <dl class="manual-definitions">
-                <div><dt>Estratégia indicada</dt><dd>Alternativa viável com maior Patrimônio Acumulado em reais de hoje.</dd></div>
+                <div><dt>Estratégia indicada</dt><dd>Na tela, é a alternativa viável com maior Patrimônio Acumulado. No relatório, segue a prioridade escolhida pelo planejador.</dd></div>
                 <div><dt>Patrimônio Acumulado</dt><dd>Patrimônio final convertido para poder de compra de hoje pela inflação esperada.</dd></div>
-                <div><dt>Custo</dt><dd>Soma nominal dos desembolsos dentro do horizonte, incluindo entrada, lance, parcelas e aluguel de espera.</dd></div>
+                <div><dt>Custo na tela</dt><dd>Soma nominal dos desembolsos dentro do horizonte, incluindo entrada, lance, parcelas e aluguel de espera.</dd></div>
+                <div><dt>Menor custo no relatório</dt><dd>Compara os desembolsos contratuais completos, inclusive parcelas posteriores ao horizonte, sem confundir custo com patrimônio.</dd></div>
                 <div><dt>Parcela inicial</dt><dd>Composição do primeiro desembolso recorrente. No IQ, financiamento e consórcio aparecem separadamente.</dd></div>
                 <div><dt>Aquisição</dt><dd>Mês em que o bem entra no patrimônio da estratégia.</dd></div>
               </dl>
@@ -558,10 +621,11 @@
 
             <section id="manual-pdf">
               <span class="manual-section-number">10</span>
-              <h2>Geração do PDF</h2>
+              <h2>Geração do relatório em PDF</h2>
               <ol class="manual-steps">
                 <li>Revise os campos e os resultados na tela.</li>
-                <li>Clique em <strong>Gerar PDF</strong>.</li>
+                <li>Clique em <strong>Gerar relatório</strong>.</li>
+                <li>Informe cliente, planejador e a prioridade que orienta o parecer.</li>
                 <li>Na janela do navegador, escolha <strong>Salvar como PDF</strong>.</li>
                 <li>Mantenha orientação e escala padrão, salvo necessidade específica.</li>
                 <li>Verifique a visualização antes de salvar.</li>

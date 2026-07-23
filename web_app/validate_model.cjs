@@ -17,6 +17,35 @@ near(
   0.01,
   "preset credito liquido cobre preco futuro",
 );
+for (const strategy of preset.strategies) {
+  for (const row of strategy.rows.slice(0, preset.inputs.horizonMonths)) {
+    near(row.entryOrBid + row.payment, row.productOutflow, 0.01, `${strategy.id}: saida mensal do produto`);
+    near(row.inputs - row.outputs, row.netCashImpact, 0.01, `${strategy.id}: impacto mensal no caixa`);
+  }
+  near(
+    strategy.productOutflowWithinHorizon + strategy.rentPaidWithinHorizon,
+    strategy.totalOutputs,
+    0.01,
+    `${strategy.id}: composicao das saidas no horizonte`,
+  );
+  near(
+    strategy.rentReceivedWithinHorizon,
+    strategy.totalInputs,
+    0.01,
+    `${strategy.id}: composicao das entradas no horizonte`,
+  );
+  near(
+    strategy.rentReceivedWithinHorizon - strategy.totalOutputs,
+    strategy.netCashImpactWithinHorizon,
+    0.01,
+    `${strategy.id}: impacto liquido no caixa`,
+  );
+  near(strategy.netCashImpactWithinHorizon, strategy.netFlow, 0.01, `${strategy.id}: netFlow legado`);
+  assert.ok(
+    strategy.lifetimeContractualOutflow + 0.01 >= strategy.productOutflowWithinHorizon,
+    `${strategy.id}: desembolso vitalicio nao pode omitir pagamentos do horizonte`,
+  );
+}
 
 const scenarioResults = [];
 for (const assetType of ["Imovel", "Veiculo"]) {
@@ -84,6 +113,76 @@ const mutuallyExclusive = model.normalizeInputs({
 assert.equal(mutuallyExclusive.useFixedBid, true, "lance fixo deveria prevalecer no conflito");
 assert.equal(mutuallyExclusive.useFreeBid, false, "lance livre deveria ser desativado no conflito");
 
+const disabledCard = model.calculateScenario({
+  ...model.defaultInputs,
+  cardEnabled: false,
+  cardRemainingMonths: 0,
+  cardPurchaseMonth: 24,
+}).strategies.find((strategy) => strategy.id === "card");
+assert.equal(disabledCard.isEnabled, false, "carta desativada deve expor isEnabled=false");
+assert.equal(disabledCard.isAffordable, true, "acessibilidade deve ser independente da ativacao");
+assert.equal(disabledCard.isViable, false, "isViable legado deve continuar combinando ativacao e caixa");
+assert.equal(disabledCard.payoffMonth, null, "carta desativada nao deve ter mes de quitacao");
+near(disabledCard.lifetimeContractualOutflow, 0, 0.01, "carta desativada sem desembolso contratual");
+
+const paidUpCard = model.calculateScenario({
+  ...model.defaultInputs,
+  cardEnabled: true,
+  cardRemainingMonths: 0,
+  cardPurchaseMonth: 24,
+  cardUseMonth: 24,
+}).strategies.find((strategy) => strategy.id === "card");
+assert.equal(paidUpCard.payoffMonth, 24, "carta sem parcelas deve quitar no mes da compra");
+near(
+  paidUpCard.lifetimeContractualOutflow,
+  paidUpCard.entryOrInitial,
+  0.01,
+  "carta sem parcelas deve considerar somente custo inicial",
+);
+
+const deferredCostInputs = {
+  ...model.defaultInputs,
+  horizonMonths: 60,
+  usage: "Aquisicao",
+  finMonths: 60,
+  annualInterest: 0,
+  annualTR: 0,
+  insurance: 0,
+  entryPct: 0,
+  consAdminPct: 1,
+  consReservePct: 0,
+  consInsurancePct: 0,
+  consMonths: 240,
+  consAdjustPct: 0,
+  directMonth: 60,
+  useFixedBid: false,
+  useFreeBid: false,
+  useEmbeddedBid: false,
+  monthlyCash: 1000000,
+  reserve: 1000000,
+};
+const deferredCost60 = model.calculateScenario(deferredCostInputs);
+const deferredFin60 = deferredCost60.strategies.find((strategy) => strategy.id === "fin");
+const deferredCons60 = deferredCost60.strategies.find((strategy) => strategy.id === "cons");
+assert.ok(
+  deferredCons60.productOutflowWithinHorizon < deferredFin60.productOutflowWithinHorizon,
+  "consorcio postergado deve parecer mais barato apenas dentro do horizonte curto deste teste",
+);
+assert.ok(
+  deferredCons60.lifetimeContractualOutflow > deferredFin60.lifetimeContractualOutflow,
+  "custo vitalicio deve impedir que parcelas postergadas tornem o consorcio falsamente mais barato",
+);
+const deferredCons420 = model.calculateScenario({
+  ...deferredCostInputs,
+  horizonMonths: 420,
+}).strategies.find((strategy) => strategy.id === "cons");
+near(
+  deferredCons60.lifetimeContractualOutflow,
+  deferredCons420.lifetimeContractualOutflow,
+  0.01,
+  "desembolso contratual vitalicio deve ser independente do horizonte",
+);
+
 const bid25 = model.calculateScenario({ ...model.defaultInputs, fixedBidPct: 0.25, embeddedBidPct: 0.1 });
 const bid35 = model.calculateScenario({ ...model.defaultInputs, fixedBidPct: 0.35, embeddedBidPct: 0.1 });
 assert.notEqual(
@@ -126,6 +225,8 @@ let expectedEconomicCost =
   longTailCardInput.cardPrice +
   longTailCardInput.cardTransferFee -
   longTailCardInput.cardGrossCredit;
+let expectedLifetimeContractualOutflow =
+  longTailSchedule.initialCost;
 
 for (let month = longTailCardInput.cardPurchaseMonth; month <= longTailLastMonth; month += 1) {
   const adjustmentFactor = Math.pow(
@@ -133,6 +234,7 @@ for (let month = longTailCardInput.cardPurchaseMonth; month <= longTailLastMonth
     Math.floor((month - longTailCardInput.cardPurchaseMonth) / 12),
   );
   const installment = longTailCardInput.cardInstallment * adjustmentFactor;
+  expectedLifetimeContractualOutflow += installment;
   expectedEconomicCost += installment / Math.pow(1 + monthlyReturn, month);
   if (month > longTailCardInput.horizonMonths) {
     expectedHorizonObligation += installment / Math.pow(1 + monthlyReturn, month - longTailCardInput.horizonMonths);
@@ -146,6 +248,12 @@ assert.ok(longTailSchedule.rows[longTailSchedule.rows.length - 1].installment > 
 near(horizonCardRow.obligation, expectedHorizonObligation, 0.01, "obrigacao futura da carta");
 near(longTailStrategy.debt, horizonCardRow.obligation, 0.01, "divida da carta no horizonte");
 near(longTailSchedule.economicCost, expectedEconomicCost, 0.01, "custo economico com cauda longa");
+near(
+  longTailStrategy.lifetimeContractualOutflow,
+  expectedLifetimeContractualOutflow,
+  0.01,
+  "desembolso contratual nominal da carta com cauda longa",
+);
 
 const priceDefault = model.calculateScenario({ ...model.defaultInputs, financingSystem: "PRICE" });
 near(priceDefault.inputs.annualTR, 0, 1e-9, "PRICE com indexador padrao zero");
@@ -163,5 +271,8 @@ console.log(JSON.stringify({
   bids: "OK",
   cardSurplus: "ignored",
   cardLongTail: "OK",
+  separatedCashMetrics: "OK",
+  lifetimeContractualOutflow: "OK",
+  strategyStatus: "OK",
   priceIndexer: "OK",
 }));

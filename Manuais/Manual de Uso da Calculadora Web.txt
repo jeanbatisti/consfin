@@ -41,16 +41,30 @@ Fluxo recomendado:
 4) Revise consorcio IQ, consorcio direto, lances e carta contemplada.
 5) Verifique viabilidade de caixa.
 6) Compare patrimonio, custo e status somente entre estrategias viaveis.
+7) Clique em Gerar relatorio, confirme cliente e planejador e escolha a prioridade do parecer.
 
 5. LEITURA DOS RESULTADOS
 
 - Cards: mostram patrimonio corrigido, parcela inicial, entrada/lance, custo e status de caixa.
 - Tabela comparativa: detalha entrada/lance, parcela inicial, aquisicao, custo, patrimonio e status.
 - Graficos: usam as cinco estrategias e excluem resultados inviaveis quando a comparacao patrimonial ficaria enganosa.
+- Na tela, custo representa os desembolsos dentro do horizonte. No relatorio, Menor custo usa o desembolso contratual completo, inclusive parcelas posteriores ao horizonte.
 - Nao ha TIR, IRR, CET ou custo efetivo na interface.
 
 6. INTEGRACAO R2
 
 Quando a calculadora e aberta a partir da R2, o botao Aplicar na R2 aparece no topo. Ele devolve a simulacao revisada, a melhor estrategia viavel e as premissas usadas. A integracao foi preservada nesta versao.
+
+7. RELATORIO DE AQUISICAO
+
+- Clique em Gerar relatorio quando a simulacao estiver revisada. Informe o nome do cliente e o nome do planejador financeiro; os dois campos sao obrigatorios.
+- A capa apresenta RELATORIO DE AQUISICAO, o titulo Estrategias de Credito, o cliente, a data e o planejador. A frase de encerramento e "Clareza para construir seu patrimonio".
+- Preservar mais patrimonio vem pre-selecionado. O planejador pode mudar a prioridade para Menor custo, Quitar antes, Adquirir antes ou Comparar sem recomendacao.
+- O PDF tem quatro paginas A4: capa, leitura do planejador, comparacao das alternativas e parecer final. Ele foi pensado para ser compartilhado com o cliente, sem termos tecnicos desnecessarios.
+- Patrimonio corrigido mostra o resultado estimado em valores de hoje. Menor custo usa o desembolso contratual completo, inclusive parcelas posteriores ao horizonte da simulacao.
+- A pagina de comparacao ordena as alternativas por patrimonio corrigido e por custo contratual. Verde identifica o melhor resultado de cada criterio.
+- O parecer usa regras deterministicas, sem IA. Os numeros sempre saem da simulacao atual e nao ha recomendacao arbitraria quando ha empate, dados ausentes ou a opcao Comparar sem recomendacao foi escolhida.
+- O nome do planejador pode ser lembrado neste navegador; o nome do cliente nao e armazenado.
+- Ao confirmar, use a janela de impressao do navegador para salvar em PDF A4. Mantenha os graficos de plano de fundo ativados e nao inclua cabecalhos ou rodapes do navegador.
 
 Atencao: a liberacao de carta contemplada depende da administradora, cadastro, garantias, contrato e regras de uso do credito.
